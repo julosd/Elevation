@@ -1,0 +1,7 @@
+﻿services:
+  elevation:
+    image: elevation
+    build:
+      context: .
+      dockerfile: Dockerfile
+
