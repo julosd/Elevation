@@ -1,41 +1,61 @@
+using Elevation.Interfaces.Services;
+using Elevation.Services;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<IGeneral, General>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-  app.MapOpenApi();
-}
-
 app.UseHttpsRedirection();
 
-var summaries = new[]
+app.MapGet("/elevation", async (IGeneral general, double latitude, double longitude, int zoom) =>
 {
-  "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
+  try
   {
-    var forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-          DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-          Random.Shared.Next(-20, 55),
-          summaries[Random.Shared.Next(summaries.Length)]
-        ))
-      .ToArray();
-    return forecast;
-  })
-  .WithName("GetWeatherForecast");
+    var tile = general.GetTile(latitude, longitude, zoom);
+    var raster = await general.GetRaster(tile);
+    var elevation = general.GetElevation(raster);
+    return Results.Ok(elevation);
+  }
+  catch (HttpRequestException ex)
+  {
+    return Results.Problem(
+      detail: ex.Message,
+      statusCode: 503,
+      title: "Erreur lors de la récupération de la tuile"
+    );
+  }
+  catch (Exception ex)
+  {
+    return Results.Problem(
+      statusCode: 500,
+      title: "Erreur serveur."
+    );
+  }
+});
+
+
+
+
+
+
+
+
+
+
+/*
+app.MapGet("/tiles", (IGeneral general, double latitude, double longitude, int zoom) =>
+{
+  var tile = general.GetTile(latitude, longitude, zoom);
+  var url =
+    $"curl https://api.mapbox.com/v4/mapbox.satellite/{tile.Z}/{tile.X}/{tile.Y}@2x.png?access_token=pk.eyJ1IjoiZ3pvciIsImEiOiJjbTIwczk2MG8waGdqMmpzOHR2cjd2MDkwIn0.MC7S7t14bEbVQ7Tf3NdvVg --output \"test.png\"";
+  return Results.Ok(url);
+});
+*/
+
+
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-  public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
