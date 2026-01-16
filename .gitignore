@@ -24,6 +24,8 @@ bld/
 [Ll]og/
 [Ll]ogs/
 
+.idea/*
+
 # .NET Core
 project.lock.json
 project.fragment.lock.json
