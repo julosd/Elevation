@@ -1,4 +1,8 @@
+using System.Globalization;
+using System.Text;
+using System.Xml.Linq;
 using Elevation.Interfaces.Services;
+using Elevation.Models;
 using Elevation.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -33,6 +37,51 @@ app.MapGet("/elevation", async (IGeneral general, double latitude, double longit
     return Results.Problem(
       statusCode: 500,
       title: "Erreur serveur."
+    );
+  }
+});
+
+app.MapGet("/track", async (IGeneral general) =>
+{
+  try
+  {
+    var obj = new StringBuilder();
+    var inv = CultureInfo.InvariantCulture;
+
+    var doc = XDocument.Load("../../.temp/kml.kml");
+
+    var coordinatesText = doc
+      .Descendants()
+      .FirstOrDefault(e => e.Name.LocalName == "coordinates")
+      ?.Value;
+
+    if (string.IsNullOrWhiteSpace(coordinatesText))
+      throw new InvalidOperationException("Aucune coordonnée trouvée dans le KML.");
+    
+    var coordonnees = new List<Coordinates>();
+
+    foreach (var c in coordinatesText.Split((char[])null, StringSplitOptions.RemoveEmptyEntries))
+    {
+      var parts = c.Split(',');
+      if (parts.Length < 2)
+        throw new FormatException($"Coordonnée invalide : {c}");
+
+      var lon = double.Parse(parts[0], CultureInfo.InvariantCulture);
+      var lat = double.Parse(parts[1], CultureInfo.InvariantCulture);
+      
+      coordonnees.Add(new Coordinates(lat, lon));
+
+    }
+    Console.WriteLine(coordonnees.Count);
+    var result = await general.GetElevation(coordonnees);
+    return Results.Ok(result);
+  }
+  catch (Exception ex)
+  {
+    return Results.Problem(
+      detail: ex.Message,
+      statusCode: 500,
+      title: "Erreur serveur"
     );
   }
 });

@@ -10,4 +10,5 @@ public interface IGeneral
   double GetElevation(Bitmap bitmap);
   double GetElevation(Color c);
   Pixel GetPixel(Bitmap bitmap, double latitude, double longitude, int zoom);
+  Task<List<Coordinates>> GetElevation(List<Coordinates> coordinatesList);
 }
