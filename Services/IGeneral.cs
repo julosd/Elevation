@@ -8,4 +8,7 @@ public interface IGeneral
   Tile GetTile(double lat, double lon, int zoom);
   Task<Bitmap> GetRaster(Tile tile);
   double GetElevation(Bitmap bitmap);
+  double GetElevation(Color c);
+  Pixel GetPixel(Bitmap bitmap, double latitude, double longitude, int zoom);
+  Task<List<Coordinates>> GetElevation(List<Coordinates> coordinatesList);
 }
