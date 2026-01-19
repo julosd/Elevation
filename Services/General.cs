@@ -1,52 +1,78 @@
-using System.Drawing;
+using System.Globalization;
+using System.Text;
 using Elevation.Interfaces.Services;
 using Elevation.Models;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.ColorSpaces;
+using SixLabors.ImageSharp.PixelFormats;
+using Image = SixLabors.ImageSharp.Image;
 
 namespace Elevation.Services;
 
 public class General(HttpClient httpClient, IConfiguration configuration) : IGeneral
 {
   /// <summary>
-  /// Renvoi une tuile x, y , zoom d'après des coordonées
+  /// Renvoi une tuile x, y , zoom d'après des coordonnées
   /// </summary>
   /// <param name="lat"></param>
   /// <param name="lon"></param>
   /// <param name="zoom"></param>
   /// <returns></returns>
-  public Tile GetTile(double lat, double lon, int zoom) => new (lon, lat, zoom);
+  public Tile GetTile(double lat, double lon, int zoom) => new (lat, lon, zoom);
   
   
   
   /// <summary>
-  /// Renvoi une raster <c>Bitmap</c> d'après une tuile <c>Tile</c>
+  /// Renvoi un raster <c>Bitmap</c> d'après une tuile <c>Tile</c>
   /// </summary>
   /// <param name="tile"></param>
   /// <returns></returns>
-  public async Task<Bitmap> GetRaster(Tile tile)
+  public async Task<Image<Rgba32>> GetRaster(Tile tile)
   {
     var token = configuration["Secrets:MapBoxToken"];
-    var url = $"https://api.mapbox.com/v4/mapbox.terrain-rgb/{tile.Z}/{tile.X}/{tile.Y}.pngraw?access_token={token}";
+    var url =
+      $"https://api.mapbox.com/v4/mapbox.terrain-rgb/{tile.Z}/{tile.X}/{tile.Y}.pngraw?access_token={token}";
+
     using var response = await httpClient.GetAsync(url);
     response.EnsureSuccessStatusCode();
 
-    // Lire le flux
     await using var stream = await response.Content.ReadAsStreamAsync();
-    return new Bitmap(stream);
+    return await Image.LoadAsync<Rgba32>(stream);
   }
 
-  
-  
-  /// <summary>
-  /// Renvoi une élévation en mètre en fonction d'une <c>Bitmap</c>
-  /// </summary>
-  /// <param name="bitmap"></param>
-  /// <returns></returns>
-  public double GetElevation(Bitmap bitmap)
+
+  public void Create3dObjects(List<Coordinates> coordinates)
   {
-    var c = bitmap.GetPixel(1, 1);
-    return GetElevation(c);
+    var obj = new StringBuilder();
+    var inv = CultureInfo.InvariantCulture;
+    
+    var zMin = coordinates.Min(c => c.Altitude);
+    var zMax = coordinates.Max(c => c.Altitude);
+
+    var lat0 = coordinates[0].Latitude;
+    var lon0 = coordinates[0].Longitude;
+
+    var lat0Rad = lat0 * Math.PI / 180.0;
+    const double metersPerDegree = 1;
+
+    
+    foreach (var coordonnee in coordinates)
+    {
+      //var y = (coordonnee.Longitude - lon0) * Math.Cos(lat0Rad) * metersPerDegree;
+      var x = (coordonnee.Latitude -  lat0) * metersPerDegree;
+      var y = (coordonnee.Longitude - lon0) * Math.Cos(lat0Rad) * metersPerDegree;
+      //var z = (coordonnee.Altitude - zMin) / (zMax - zMin) * 10.0;
+      var z = (coordonnee.Altitude - zMin) / 64; // ICI il faut connaitre la largeur de la tuile pour que la hauteur corresponde
+
+      z ??= 0;
+      
+      obj.AppendLine($"v {(x).ToString(inv)} {z!.Value.ToString(inv)} {y.ToString(inv)}");
+      //obj.AppendLine($"v {(x + 0.5).ToString(inv)} {z} {y.ToString(inv)}");
+    }
+    File.WriteAllText("cube.obj", obj.ToString());
   }
-  
+
+
   
   
   /// <summary>
@@ -54,21 +80,57 @@ public class General(HttpClient httpClient, IConfiguration configuration) : IGen
   /// </summary>
   /// <param name="c"></param>
   /// <returns></returns>
-  public double GetElevation(Color c) => Math.Round((-10000 + ((c.R * 256 * 256 + c.G * 256 + c.B) * 0.1)), 1);
-
-  public double GetElevation(Pixel pixel) => GetElevation(pixel.Color);
+  public double GetElevation(Rgba32 c) => Math.Round((-10000 + ((c.R * 256 * 256 + c.G * 256 + c.B) * 0.1)), 1);
   
   /// <summary>
-  /// Récupère le x et y d'un pixel en fonction des coordonnées géospatioales pour un zoom et une raster donné.
+  /// Renvoi une élévation en mètres à partir d'une image raster.
   /// </summary>
-  /// <param name="bitmap"></param>
+  /// <param name="raster"></param>
+  /// <returns></returns>
+  public double GetElevation(Image<Rgba32> raster)
+  {
+    var color = raster[1, 1];
+    return GetElevation(color);
+  }
+  
+  public double GetElevation(Pixel pixel) => GetElevation(pixel.Color);
+  
+  
+
+  public List<Coordinates> GetAllElevationInRaster(Image<Rgba32> raster)
+  {
+    var coordinates = new List<Coordinates>(raster.Width * raster.Height);
+
+    for (var i = 0; i < raster.Width; i++)
+    {
+      for (var u = 0; u < raster.Height; u++)
+      {
+        var color = raster[i, u];
+        var elevation = GetElevation(color);
+        coordinates.Add(new Coordinates(Latitude:i, Longitude:u, Altitude:elevation));
+      }
+    }
+    Console.WriteLine("Nombre de pixel largeur : " + raster.Width);
+    Console.WriteLine("Nombre de pixel hauteur : " + raster.Height);
+    Console.WriteLine("Nombre de pixel total : " + raster.Width * raster.Height);
+    Console.WriteLine("Nombre de coordonnées : " + coordinates.Count);
+    
+    
+    return coordinates;
+    
+  }
+  
+  /// <summary>
+  /// Récupère le x et y d'un pixel en fonction des coordonnées géospatiales pour un zoom et un raster donné.
+  /// </summary>
+  /// <param name="raster"></param>
   /// <param name="latitude"></param>
   /// <param name="longitude"></param>
   /// <param name="zoom"></param>
   /// <returns></returns>
-  public Pixel GetPixel(Bitmap bitmap, double latitude, double longitude, int zoom = 14)
+  public Pixel GetPixel(Image<Rgba32> raster, double latitude, double longitude, int zoom = 14)
   {
-    // Longitude normalisée entre 0 et 1
+    // Longitude normalisée entre 0 et 1.
     var u = (longitude + 180.0) / 360.0;
 
     // Latitude convertie en radians
@@ -94,19 +156,19 @@ public class General(HttpClient httpClient, IConfiguration configuration) : IGen
     var localX = tileXf - tileX;
     var localY = tileYf - tileY;
 
-    // Conversion en coordonnées pixel dans la tuile (0..255)
+    // Conversion en coordonné pixel dans la tuile (0..255)
     var pixelX = (int)(localX * 256);
     var pixelY = (int)(localY * 256);
 
     // Sécurité : on borne les valeurs
     pixelX = Math.Clamp(pixelX, 0, 255);
     pixelY = Math.Clamp(pixelY, 0, 255);
-    var pixelValue = bitmap.GetPixel(pixelX, pixelY);
+    var color = raster[pixelX, pixelY];
 
-    return new Pixel(pixelX, pixelY, pixelValue);
+    return new Pixel(pixelX, pixelY, color);
   }
   
-  public Pixel GetPixel(Bitmap bitmap, Coordinates coord) => GetPixel(bitmap, coord.Latitude, coord.Longitude);
+  public Pixel GetPixel(Image<Rgba32> raster, Coordinates coord) => GetPixel(raster, coord.Latitude, coord.Longitude);
 
   
   
@@ -114,7 +176,7 @@ public class General(HttpClient httpClient, IConfiguration configuration) : IGen
   {
     var nombreAppelMapBox = 0;
     var result = new List<Coordinates>(coordinatesList.Count);
-    var rasterCache = new Dictionary<Tile, Bitmap>();
+    var rasterCache = new Dictionary<Tile, Image<Rgba32>>();
 
     foreach (var coord in coordinatesList)
     {
@@ -137,4 +199,6 @@ public class General(HttpClient httpClient, IConfiguration configuration) : IGen
 
     return result;
   }
+  
+  
 }

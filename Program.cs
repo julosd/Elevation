@@ -45,9 +45,6 @@ app.MapGet("/track", async (IGeneral general) =>
 {
   try
   {
-    var obj = new StringBuilder();
-    var inv = CultureInfo.InvariantCulture;
-
     var doc = XDocument.Load("../../.temp/kml.kml");
 
     var coordinatesText = doc
@@ -89,7 +86,7 @@ app.MapGet("/track", async (IGeneral general) =>
 
 
 
-app.MapGet("/elevation2", async (IGeneral general, double latitude, double longitude) =>
+app.MapGet("/elevation2", async (IGeneral general, double latitude, double longitude, int zoom = 14) =>
 {
   try
   {
@@ -116,7 +113,15 @@ app.MapGet("/elevation2", async (IGeneral general, double latitude, double longi
   }
 });
 
+app.MapGet("/test/", async (IGeneral general, double latitude, double longitude, int zoom = 14) =>
+{
+  var tile = general.GetTile(latitude, longitude, zoom);
+  var raster = await general.GetRaster(tile);
+  var coordinates = general.GetAllElevationInRaster(raster);
+  general.Create3dObjects(coordinates);
 
+  return Results.Ok("ok");
+});
 
 
 
