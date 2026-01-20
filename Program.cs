@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text;
 using System.Xml.Linq;
 using Elevation.Interfaces.Services;
 using Elevation.Models;
@@ -15,13 +14,15 @@ var app = builder.Build();
 
 app.UseHttpsRedirection();
 
-app.MapGet("/elevation", async (IGeneral general, double latitude, double longitude) =>
+#region elevation
+app.MapGet("/elevation", async (IGeneral general, double latitude, double longitude, int zoom = 14) =>
 {
   try
   {
-    var tile = general.GetTile(latitude, longitude, 30);
+    var tile = general.GetTile(latitude, longitude, zoom);
     var raster = await general.GetRaster(tile);
-    var elevation = general.GetElevation(raster);
+    var pixel = general.GetPixel(raster, latitude, longitude, zoom);
+    var elevation = general.GetElevation(pixel.Color);
     return Results.Ok(elevation);
   }
   catch (HttpRequestException ex)
@@ -40,6 +41,7 @@ app.MapGet("/elevation", async (IGeneral general, double latitude, double longit
     );
   }
 });
+#endregion
 
 app.MapGet("/track", async (IGeneral general) =>
 {
@@ -69,8 +71,8 @@ app.MapGet("/track", async (IGeneral general) =>
       coordonnees.Add(new Coordinates(lat, lon));
 
     }
-    Console.WriteLine(coordonnees.Count);
     var result = await general.GetElevation(coordonnees);
+    
     return Results.Ok(result);
   }
   catch (Exception ex)
@@ -85,15 +87,40 @@ app.MapGet("/track", async (IGeneral general) =>
 
 
 
+app.MapGet("/test/", async (IGeneral general, double latitude, double longitude, int zoom = 14) =>
+{
+  var tile = general.GetTile(latitude, longitude, zoom);
+  var raster = await general.GetRaster(tile);
+  var coordinates = general.GetAllElevationInRaster(raster);
+  general.Create3dObjects(coordinates);
 
-app.MapGet("/elevation2", async (IGeneral general, double latitude, double longitude, int zoom = 14) =>
+  return Results.Ok("ok");
+});
+
+
+
+app.MapGet("/tiles", (IGeneral general, double latitude, double longitude, int zoom) =>
+{
+  var tile = general.GetTile(latitude, longitude, zoom);
+  var url =
+    $"curl https://api.mapbox.com/v4/mapbox.satellite/{tile.Z}/{tile.X}/{tile.Y}@2x.png?access_token=pk.eyJ1IjoiZ3pvciIsImEiOiJjbTIwczk2MG8waGdqMmpzOHR2cjd2MDkwIn0.MC7S7t14bEbVQ7Tf3NdvVg --output \"test.png\"";
+  return Results.Ok(url);
+});
+
+
+
+
+app.Run();
+
+
+/*
+app.MapGet("/elevation", async (IGeneral general, double latitude, double longitude) =>
 {
   try
   {
-    var tile = general.GetTile(latitude, longitude, 14);
+    var tile = general.GetTile(latitude, longitude, 30);
     var raster = await general.GetRaster(tile);
-    var pixel = general.GetPixel(raster, latitude, longitude, 14);
-    var elevation = general.GetElevation(pixel.Color);
+    var elevation = general.GetElevation(raster);
     return Results.Ok(elevation);
   }
   catch (HttpRequestException ex)
@@ -112,34 +139,4 @@ app.MapGet("/elevation2", async (IGeneral general, double latitude, double longi
     );
   }
 });
-
-app.MapGet("/test/", async (IGeneral general, double latitude, double longitude, int zoom = 14) =>
-{
-  var tile = general.GetTile(latitude, longitude, zoom);
-  var raster = await general.GetRaster(tile);
-  var coordinates = general.GetAllElevationInRaster(raster);
-  general.Create3dObjects(coordinates);
-
-  return Results.Ok("ok");
-});
-
-
-
-
-
-
-
-
-
-app.MapGet("/tiles", (IGeneral general, double latitude, double longitude, int zoom) =>
-{
-  var tile = general.GetTile(latitude, longitude, zoom);
-  var url =
-    $"curl https://api.mapbox.com/v4/mapbox.satellite/{tile.Z}/{tile.X}/{tile.Y}@2x.png?access_token=pk.eyJ1IjoiZ3pvciIsImEiOiJjbTIwczk2MG8waGdqMmpzOHR2cjd2MDkwIn0.MC7S7t14bEbVQ7Tf3NdvVg --output \"test.png\"";
-  return Results.Ok(url);
-});
-
-
-
-
-app.Run();
+*/
