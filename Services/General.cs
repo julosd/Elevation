@@ -3,7 +3,6 @@ using System.Text;
 using Elevation.Interfaces.Services;
 using Elevation.Models;
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.ColorSpaces;
 using SixLabors.ImageSharp.PixelFormats;
 using Image = SixLabors.ImageSharp.Image;
 
@@ -11,6 +10,7 @@ namespace Elevation.Services;
 
 public class General(HttpClient httpClient, IConfiguration configuration) : IGeneral
 {
+  #region GetTile
   /// <summary>
   /// Renvoi une tuile x, y , zoom d'après des coordonnées
   /// </summary>
@@ -19,6 +19,7 @@ public class General(HttpClient httpClient, IConfiguration configuration) : IGen
   /// <param name="zoom"></param>
   /// <returns></returns>
   public Tile GetTile(double lat, double lon, int zoom) => new (lat, lon, zoom);
+  #endregion
   
   
   
@@ -39,86 +40,7 @@ public class General(HttpClient httpClient, IConfiguration configuration) : IGen
     await using var stream = await response.Content.ReadAsStreamAsync();
     return await Image.LoadAsync<Rgba32>(stream);
   }
-
-
-  public void Create3dObjects(List<Coordinates> coordinates)
-  {
-    var obj = new StringBuilder();
-    var inv = CultureInfo.InvariantCulture;
-    
-    var zMin = coordinates.Min(c => c.Altitude);
-    var zMax = coordinates.Max(c => c.Altitude);
-
-    var lat0 = coordinates[0].Latitude;
-    var lon0 = coordinates[0].Longitude;
-
-    var lat0Rad = lat0 * Math.PI / 180.0;
-    const double metersPerDegree = 1;
-
-    
-    foreach (var coordonnee in coordinates)
-    {
-      //var y = (coordonnee.Longitude - lon0) * Math.Cos(lat0Rad) * metersPerDegree;
-      var x = (coordonnee.Latitude -  lat0) * metersPerDegree;
-      var y = (coordonnee.Longitude - lon0) * Math.Cos(lat0Rad) * metersPerDegree;
-      //var z = (coordonnee.Altitude - zMin) / (zMax - zMin) * 10.0;
-      var z = (coordonnee.Altitude - zMin) / 64; // ICI il faut connaitre la largeur de la tuile pour que la hauteur corresponde
-
-      z ??= 0;
-      
-      obj.AppendLine($"v {(x).ToString(inv)} {z!.Value.ToString(inv)} {y.ToString(inv)}");
-      //obj.AppendLine($"v {(x + 0.5).ToString(inv)} {z} {y.ToString(inv)}");
-    }
-    File.WriteAllText("cube.obj", obj.ToString());
-  }
-
-
   
-  
-  /// <summary>
-  /// Renvoi une élévation en mètre en fonction d'une <c>Color</c>
-  /// </summary>
-  /// <param name="c"></param>
-  /// <returns></returns>
-  public double GetElevation(Rgba32 c) => Math.Round((-10000 + ((c.R * 256 * 256 + c.G * 256 + c.B) * 0.1)), 1);
-  
-  /// <summary>
-  /// Renvoi une élévation en mètres à partir d'une image raster.
-  /// </summary>
-  /// <param name="raster"></param>
-  /// <returns></returns>
-  public double GetElevation(Image<Rgba32> raster)
-  {
-    var color = raster[1, 1];
-    return GetElevation(color);
-  }
-  
-  public double GetElevation(Pixel pixel) => GetElevation(pixel.Color);
-  
-  
-
-  public List<Coordinates> GetAllElevationInRaster(Image<Rgba32> raster)
-  {
-    var coordinates = new List<Coordinates>(raster.Width * raster.Height);
-
-    for (var i = 0; i < raster.Width; i++)
-    {
-      for (var u = 0; u < raster.Height; u++)
-      {
-        var color = raster[i, u];
-        var elevation = GetElevation(color);
-        coordinates.Add(new Coordinates(Latitude:i, Longitude:u, Altitude:elevation));
-      }
-    }
-    Console.WriteLine("Nombre de pixel largeur : " + raster.Width);
-    Console.WriteLine("Nombre de pixel hauteur : " + raster.Height);
-    Console.WriteLine("Nombre de pixel total : " + raster.Width * raster.Height);
-    Console.WriteLine("Nombre de coordonnées : " + coordinates.Count);
-    
-    
-    return coordinates;
-    
-  }
   
   /// <summary>
   /// Récupère le x et y d'un pixel en fonction des coordonnées géospatiales pour un zoom et un raster donné.
@@ -167,11 +89,76 @@ public class General(HttpClient httpClient, IConfiguration configuration) : IGen
 
     return new Pixel(pixelX, pixelY, color);
   }
-  
-  public Pixel GetPixel(Image<Rgba32> raster, Coordinates coord) => GetPixel(raster, coord.Latitude, coord.Longitude);
 
   
+  /// <summary>
+  /// Crée un mesh à partir de coordonnées géographiques.
+  /// </summary>
+  /// <param name="coordinates"></param>
+  public string CreateMesh(List<Coordinates> coordinates)
+  {
+    var obj = new StringBuilder();
+    var inv = CultureInfo.InvariantCulture;
+    
+    var zMin = coordinates.Min(c => c.Altitude);
+    var zMax = coordinates.Max(c => c.Altitude);
+
+    var lat0 = coordinates[0].Latitude;
+    var lon0 = coordinates[0].Longitude;
+
+    var lat0Rad = lat0 * Math.PI / 180.0;
+    const double metersPerDegree = 1;
+
+    
+    foreach (var coordonnee in coordinates)
+    {
+      if (coordonnee.Latitude % 8 == 0 && coordonnee.Longitude % 8 == 0)
+      {
+        
+        //var y = (coordonnee.Longitude - lon0) * Math.Cos(lat0Rad) * metersPerDegree;
+        var x = (coordonnee.Latitude -  lat0) * metersPerDegree;
+        var y = (coordonnee.Longitude - lon0) * Math.Cos(lat0Rad) * metersPerDegree;
+        //var z = (coordonnee.Altitude - zMin) / (zMax - zMin) * 10.0;
+        var z = (coordonnee.Altitude - zMin) / 64; // ICI il faut connaitre la largeur de la tuile pour que la hauteur corresponde
+
+        z ??= 0;
+      
+        obj.AppendLine($"v {(x).ToString(inv)} {z!.Value.ToString(inv)} {y.ToString(inv)}");
+        //obj.AppendLine($"v {(x + 0.5).ToString(inv)} {z} {y.ToString(inv)}");
+      }
+    }
+    
+    File.WriteAllText("mesh.obj", obj.ToString());
+    
+    return obj.ToString();
+  }
   
+  
+  /// <summary>
+  /// Renvoi une élévation en mètre en fonction d'une <c>Color</c>
+  /// </summary>
+  /// <param name="c"></param>
+  /// <returns></returns>
+  public double GetElevation(Rgba32 c) => Math.Round((-10000 + ((c.R * 256 * 256 + c.G * 256 + c.B) * 0.1)), 1);
+  
+  
+  /// <summary>
+  /// Renvoi une élévation en mètres à partir d'une image raster.
+  /// </summary>
+  /// <param name="raster"></param>
+  /// <returns></returns>
+  public double GetElevation(Image<Rgba32> raster)
+  {
+    var color = raster[1, 1];
+    return GetElevation(color);
+  }
+  
+  
+  /// <summary>
+  /// Renvoi une liste de coordonnées enrichies avec une élévation d'après une liste de coordonnées simples.
+  /// </summary>
+  /// <param name="coordinatesList"></param>
+  /// <returns></returns>
   public async Task<List<Coordinates>> GetElevation(List<Coordinates> coordinatesList)
   {
     var nombreAppelMapBox = 0;
@@ -182,23 +169,76 @@ public class General(HttpClient httpClient, IConfiguration configuration) : IGen
     {
       var tile = new Tile(coord.Latitude, coord.Longitude);
 
-      if (!rasterCache.TryGetValue(tile, out var bitmap))
+      if (!rasterCache.TryGetValue(tile, out var raster))
       {
-        bitmap = await GetRaster(tile);
-        rasterCache[tile] = bitmap;
+        raster = await GetRaster(tile);
+        rasterCache[tile] = raster;
         nombreAppelMapBox++;
       }
       
-      var pixel = GetPixel(bitmap, coord);
-      var elevation = GetElevation(pixel);
+      var pixel = GetPixel(raster, coord);
+      var elevation = GetElevation(pixel.Color);
 
       result.Add(coord with { Altitude = elevation });
     }
-    
-    Console.WriteLine("Nombre d'appel mapbox : " + nombreAppelMapBox);
-
     return result;
   }
   
   
+  /// <summary>
+  /// Renvoi une liste de coordonnées enrichie avec l'altitude. 
+  /// </summary>
+  /// <param name="raster"></param>
+  /// <returns></returns>
+  public List<Coordinates> GetAllElevationInRaster(Image<Rgba32> raster)
+  {
+    var coordinates = new List<Coordinates>(raster.Width * raster.Height);
+
+    for (var i = 0; i < raster.Width; i++)
+    {
+      for (var u = 0; u < raster.Height; u++)
+      {
+        var color = raster[i, u];
+        var elevation = GetElevation(color);
+        coordinates.Add(new Coordinates(Latitude:i, Longitude:u, Altitude:elevation));
+      }
+    }
+    return coordinates;
+  }
+  
+  
+  /// <summary>
+  /// Renvoi un <c>Pixel</c> d'une image raster selon des coordonnées géographiques.
+  /// </summary>
+  /// <param name="raster"></param>
+  /// <param name="coord"></param>
+  /// <returns></returns>
+  public Pixel GetPixel(Image<Rgba32> raster, Coordinates coord) => GetPixel(raster, coord.Latitude, coord.Longitude);
 }
+
+/*
+
+    
+    int width = 256 / 8;
+    int height = 256 / 8;
+
+    for (int y = 0; y < height - 1; y++)
+    {
+      for (int x = 0; x < width - 1; x++)
+      {
+        int i = y * width + x + 1; // +1 car OBJ est 1-based
+
+        int iRight = i + 1;
+        int iDown = i + width;
+        int iDownRight = iDown + 1;
+
+        // Triangle 1
+        obj.AppendLine($"f {i} {iDown} {iRight}");
+
+        // Triangle 2
+        obj.AppendLine($"f {iRight} {iDown} {iDownRight}");
+      }
+    }
+    
+    File.WriteAllText("terrain.obj", obj.ToString());
+    */
