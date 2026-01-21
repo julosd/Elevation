@@ -92,7 +92,7 @@ app.MapGet("/test/", async (IGeneral general, double latitude, double longitude,
   var tile = general.GetTile(latitude, longitude, zoom);
   var raster = await general.GetRaster(tile);
   var coordinates = general.GetAllElevationInRaster(raster);
-  general.Create3dObjects(coordinates);
+  var mesh = general.CreateMesh(coordinates);
 
   return Results.Ok("ok");
 });

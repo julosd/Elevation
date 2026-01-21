@@ -3,7 +3,6 @@ using System.Text;
 using Elevation.Interfaces.Services;
 using Elevation.Models;
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.ColorSpaces;
 using SixLabors.ImageSharp.PixelFormats;
 using Image = SixLabors.ImageSharp.Image;
 
@@ -96,7 +95,7 @@ public class General(HttpClient httpClient, IConfiguration configuration) : IGen
   /// Crée un mesh à partir de coordonnées géographiques.
   /// </summary>
   /// <param name="coordinates"></param>
-  public void Create3dObjects(List<Coordinates> coordinates)
+  public string CreateMesh(List<Coordinates> coordinates)
   {
     var obj = new StringBuilder();
     var inv = CultureInfo.InvariantCulture;
@@ -113,18 +112,25 @@ public class General(HttpClient httpClient, IConfiguration configuration) : IGen
     
     foreach (var coordonnee in coordinates)
     {
-      //var y = (coordonnee.Longitude - lon0) * Math.Cos(lat0Rad) * metersPerDegree;
-      var x = (coordonnee.Latitude -  lat0) * metersPerDegree;
-      var y = (coordonnee.Longitude - lon0) * Math.Cos(lat0Rad) * metersPerDegree;
-      //var z = (coordonnee.Altitude - zMin) / (zMax - zMin) * 10.0;
-      var z = (coordonnee.Altitude - zMin) / 64; // ICI il faut connaitre la largeur de la tuile pour que la hauteur corresponde
+      if (coordonnee.Latitude % 8 == 0 && coordonnee.Longitude % 8 == 0)
+      {
+        
+        //var y = (coordonnee.Longitude - lon0) * Math.Cos(lat0Rad) * metersPerDegree;
+        var x = (coordonnee.Latitude -  lat0) * metersPerDegree;
+        var y = (coordonnee.Longitude - lon0) * Math.Cos(lat0Rad) * metersPerDegree;
+        //var z = (coordonnee.Altitude - zMin) / (zMax - zMin) * 10.0;
+        var z = (coordonnee.Altitude - zMin) / 64; // ICI il faut connaitre la largeur de la tuile pour que la hauteur corresponde
 
-      z ??= 0;
+        z ??= 0;
       
-      obj.AppendLine($"v {(x).ToString(inv)} {z!.Value.ToString(inv)} {y.ToString(inv)}");
-      //obj.AppendLine($"v {(x + 0.5).ToString(inv)} {z} {y.ToString(inv)}");
+        obj.AppendLine($"v {(x).ToString(inv)} {z!.Value.ToString(inv)} {y.ToString(inv)}");
+        //obj.AppendLine($"v {(x + 0.5).ToString(inv)} {z} {y.ToString(inv)}");
+      }
     }
-    File.WriteAllText("cube.obj", obj.ToString());
+    
+    File.WriteAllText("mesh.obj", obj.ToString());
+    
+    return obj.ToString();
   }
   
   
@@ -209,3 +215,30 @@ public class General(HttpClient httpClient, IConfiguration configuration) : IGen
   /// <returns></returns>
   public Pixel GetPixel(Image<Rgba32> raster, Coordinates coord) => GetPixel(raster, coord.Latitude, coord.Longitude);
 }
+
+/*
+
+    
+    int width = 256 / 8;
+    int height = 256 / 8;
+
+    for (int y = 0; y < height - 1; y++)
+    {
+      for (int x = 0; x < width - 1; x++)
+      {
+        int i = y * width + x + 1; // +1 car OBJ est 1-based
+
+        int iRight = i + 1;
+        int iDown = i + width;
+        int iDownRight = iDown + 1;
+
+        // Triangle 1
+        obj.AppendLine($"f {i} {iDown} {iRight}");
+
+        // Triangle 2
+        obj.AppendLine($"f {iRight} {iDown} {iDownRight}");
+      }
+    }
+    
+    File.WriteAllText("terrain.obj", obj.ToString());
+    */
