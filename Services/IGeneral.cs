@@ -13,5 +13,4 @@ public interface IGeneral
   Pixel GetPixel(Image<Rgba32> raster, double latitude, double longitude, int zoom);
   Task<List<Coordinates>> GetElevation(List<Coordinates> coordinatesList);
   List<Coordinates> GetAllElevationInRaster(Image<Rgba32> raster);
-  string CreateMesh(List<Coordinates> coordinates);
 }

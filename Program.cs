@@ -9,6 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<IGeneral, General>();
+builder.Services.AddScoped<IModelisation, Modelisation>();
 
 var app = builder.Build();
 
@@ -85,14 +86,26 @@ app.MapGet("/track", async (IGeneral general) =>
   }
 });
 
-
-
-app.MapGet("/test/", async (IGeneral general, double latitude, double longitude, int zoom = 14) =>
+app.MapGet("/test2/", async (IGeneral general, IModelisation modelisation, double latitude, double longitude, int zoom = 14) =>
 {
   var tile = general.GetTile(latitude, longitude, zoom);
   var raster = await general.GetRaster(tile);
   var coordinates = general.GetAllElevationInRaster(raster);
-  var mesh = general.CreateMesh(coordinates);
+  var levels = modelisation.CreateLevel(coordinates);
+  modelisation.CreateTerrain(levels);
+  
+
+  return Results.Ok("ok");
+});
+
+
+
+app.MapGet("/test/", async (IGeneral general, IModelisation modelisation, double latitude, double longitude, int zoom = 14) =>
+{
+  var tile = general.GetTile(latitude, longitude, zoom);
+  var raster = await general.GetRaster(tile);
+  var coordinates = general.GetAllElevationInRaster(raster);
+  var mesh = modelisation.CreateMesh(coordinates);
 
   return Results.Ok("ok");
 });
