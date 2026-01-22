@@ -77,7 +77,6 @@ public sealed class Modelisation : IModelisation
           obj.AppendLine($"v {(x).ToString(inv)} {z.ToString(inv)} {y.ToString(inv)}");
         }
       }
-      
     }
     File.WriteAllText("levels.obj", obj.ToString());
   }
