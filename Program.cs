@@ -90,9 +90,9 @@ app.MapGet("/test2/", async (IGeneral general, IModelisation modelisation, doubl
 {
   var tile = general.GetTile(latitude, longitude, zoom);
   var raster = await general.GetRaster(tile);
-  var coordinates = general.GetAllElevationInRaster(raster);
-  var levels = modelisation.CreateLevel(coordinates);
-  modelisation.CreateTerrain(levels);
+  var coordinates = general.ExtractCoordinatesRelativesFromRaster(raster);
+  //var levels = modelisation.IndexElevationByXY(coordinates);
+  //modelisation.CreateTerrain(levels);
   
 
   return Results.Ok("ok");
@@ -100,12 +100,13 @@ app.MapGet("/test2/", async (IGeneral general, IModelisation modelisation, doubl
 
 
 
-app.MapGet("/test/", async (IGeneral general, IModelisation modelisation, double latitude, double longitude, int zoom = 14) =>
+app.MapGet("/mesh/", async (IGeneral general, IModelisation modelisation, double latitude, double longitude, int zoom = 14) =>
 {
   var tile = general.GetTile(latitude, longitude, zoom);
+  var tileSize = general.GetTileSize(latitude, zoom);
   var raster = await general.GetRaster(tile);
-  var coordinates = general.GetAllElevationInRaster(raster);
-  var mesh = modelisation.CreateMesh(coordinates);
+  var coordinates = general.ExtractCoordinatesRelativesFromRaster(raster);
+  var mesh = modelisation.CreateMesh(coordinates, tileSize);
 
   return Results.Ok("ok");
 });

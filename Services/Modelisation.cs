@@ -7,40 +7,74 @@ namespace Elevation.Services;
 public sealed class Modelisation : IModelisation
 {
   /// <summary>
-  /// Crée un mesh à partir de coordonnées géographiques.
+  /// Crée un mesh OBJ à partir d'un raster représenté sous forme de grille 2D.
   /// </summary>
-  /// <param name="coordinates"></param>
-  public string CreateMesh(List<Coordinates> coordinates)
+  /// <param name="elevationGrid">Grille 2D des altitudes (double).</param>
+  /// <param name="step">Pas de filtrage pour le mesh (ex: 8 pour prendre un point sur 8).</param>
+  /// <param name="tileSize"></param>
+  /// <returns>Chaîne contenant le contenu du fichier OBJ.</returns>
+  public string CreateMesh(double[,] elevationGrid, double tileSize, int step = 1)
   {
     var obj = new StringBuilder();
-    
-    var zMin = coordinates.Min(c => c.Altitude);
-    var zMax = coordinates.Max(c => c.Altitude);
 
-    var lat0 = coordinates[0].Latitude;
-    var lon0 = coordinates[0].Longitude;
+    var width = elevationGrid.GetLength(0);
+    var height = elevationGrid.GetLength(1);
 
-    var lat0Rad = lat0 * Math.PI / 180.0;
-    const double metersPerDegree = 1;
+    // Calcul du minimum et maximum d'altitude pour normalisation
+    var zMin = double.MaxValue;
+    var zMax = double.MinValue;
 
-    
-    foreach (var coordonnee in coordinates)
+    for (var x = 0; x < width; x++)
     {
-      if (coordonnee.Latitude % 8 == 0 && coordonnee.Longitude % 8 == 0)
+      for (var y = 0; y < height; y++)
       {
-        var x = (coordonnee.Latitude -  lat0) * metersPerDegree;
-        var y = (coordonnee.Longitude - lon0) * Math.Cos(lat0Rad) * metersPerDegree;
-        var z = (coordonnee.Altitude - zMin) / 64; // ICI il faut connaitre la largeur de la tuile pour que la hauteur corresponde
-        
-        obj.AppendLine($"v {(x).ToString(CultureInfo.InvariantCulture)} {z.ToString(CultureInfo.InvariantCulture)} {y.ToString(CultureInfo.InvariantCulture)}");
-        //obj.AppendLine($"v {(x + 0.5).ToString(inv)} {z} {y.ToString(inv)}");
+        var z = elevationGrid[x, y];
+        if (z < zMin) zMin = z;
+        if (z > zMax) zMax = z;
       }
     }
+
+    // Centre de la grille pour centrer le mesh
+    var x0 = width / 2.0;
+    var y0 = height / 2.0;
     
+    // Conversion en mètres pour chaque “pixel” de la grille
+    var metersPerPixel = tileSize / width;
+
+    // Échelle de la hauteur : on veut que la différence zMax-zMin corresponde
+    // à la même proportion que la taille horizontale d'un pixel
+    var heightScale = (zMax - zMin) / metersPerPixel; // ratio réel
+    if (heightScale == 0) heightScale = 1.0; // éviter division par zéro
+    
+    Console.WriteLine($"Tile size (m)           : {tileSize}");
+    Console.WriteLine($"Altitude max (m)        : {zMax}");
+    Console.WriteLine($"Altitude range (m)      : {zMax - zMin}");
+    Console.WriteLine($"Height scale (unit/m)   : {heightScale}");
+    Console.WriteLine($"Meters per pixel (m/px) : {metersPerPixel}");
+
+    // Boucle sur la grille avec filtrage
+    for (var x = 0; x < width; x += step)
+    {
+      for (var y = 0; y < height; y += step)
+      {
+        var z = elevationGrid[x, y];
+
+        // Conversion en coordonnées relatives centrées
+        var xf = (x - x0);
+        var yf = (y - y0);
+        var zf = (z - zMin) / metersPerPixel;
+
+        obj.AppendLine($"v {xf.ToString(CultureInfo.InvariantCulture)} {zf.ToString(CultureInfo.InvariantCulture)} {yf.ToString(CultureInfo.InvariantCulture)}");
+      }
+    }
+
+    // Sauvegarde du fichier
     File.WriteAllText("mesh.obj", obj.ToString());
-    
+
     return obj.ToString();
   }
+
+
 
 
 
@@ -57,6 +91,25 @@ public sealed class Modelisation : IModelisation
         g => g.ToList()
       );
   }
+  
+  
+  
+  /// <summary>
+  /// Renvoi les coordonnées identifiables avec un (x et y) 
+  /// </summary>
+  /// <param name="coordinates"></param>
+  /// <returns></returns>
+  public Dictionary<(int X, int Y), int> IndexElevationByXY(IEnumerable<Coordinates> coordinates)
+  {
+    return coordinates.ToDictionary(
+      c => ((int)c.Latitude, (int)c.Longitude),
+      c => (int)c.Altitude
+    );
+  }
+
+  
+  
+  
 
   public void CreateTerrain(Dictionary<double, List<Coordinates>> levels)
   {

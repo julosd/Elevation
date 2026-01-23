@@ -59,9 +59,7 @@ public class General(HttpClient httpClient, IConfiguration configuration) : IGen
     var latRad = latitude * Math.PI / 180.0;
 
     // Latitude normalisée (projection Web Mercator)
-    var v =
-      (1.0 - Math.Log(Math.Tan(latRad) + 1.0 / Math.Cos(latRad)) / Math.PI)
-      / 2.0;
+    var v = (1.0 - Math.Log(Math.Tan(latRad) + 1.0 / Math.Cos(latRad)) / Math.PI) / 2.0;
 
     // Nombre de tuiles pour ce niveau de zoom
     var n = 1 << zoom;
@@ -140,6 +138,15 @@ public class General(HttpClient httpClient, IConfiguration configuration) : IGen
     }
     return result;
   }
+
+
+  /// <summary>
+  /// Arrondit une valeur à un multiple donné.
+  /// </summary>
+  /// <param name="value"></param>
+  /// <param name="step"></param>
+  /// <returns></returns>
+  public double RoundElevation(double value, double step) => Math.Round(value / step) * step;
   
   
   /// <summary>
@@ -147,20 +154,26 @@ public class General(HttpClient httpClient, IConfiguration configuration) : IGen
   /// </summary>
   /// <param name="raster"></param>
   /// <returns></returns>
-  public List<Coordinates> GetAllElevationInRaster(Image<Rgba32> raster)
+  public double[,] ExtractCoordinatesRelativesFromRaster(Image<Rgba32> raster)
   {
-    var coordinates = new List<Coordinates>(raster.Width * raster.Height);
+    int width = raster.Width;
+    int height = raster.Height;
 
-    for (var i = 0; i < raster.Width; i++)
+    // Création de la grille 2D
+    double[,] elevationGrid = new double[width, height];
+
+    for (int y = 0; y < height; y++)
     {
-      for (var u = 0; u < raster.Height; u++)
+      for (int x = 0; x < width; x++)
       {
-        var color = raster[i, u];
-        var elevation = GetElevation(color);
-        coordinates.Add(new Coordinates(Latitude:i, Longitude:u, Altitude:elevation));
+        var color = raster[x, y];
+
+        // Conversion de la couleur en altitude (double)
+        elevationGrid[x, y] = GetElevation(color);
       }
     }
-    return coordinates;
+
+    return elevationGrid;
   }
   
   
@@ -171,7 +184,27 @@ public class General(HttpClient httpClient, IConfiguration configuration) : IGen
   /// <param name="coord"></param>
   /// <returns></returns>
   public Pixel GetPixel(Image<Rgba32> raster, Coordinates coord) => GetPixel(raster, coord.Latitude, coord.Longitude);
+  
+  
+  
+  
+  
+  static double DegreesToRadians(double deg) => deg * Math.PI / 180.0;
+  public double GetTileSize(double latitude, int zoom) => 40075016.686 * Math.Cos(DegreesToRadians(latitude)) / Math.Pow(2, zoom);
+      
+    
+  
 }
+
+
+
+
+
+
+
+
+
+
 
 /*
 
