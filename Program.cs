@@ -86,18 +86,6 @@ app.MapGet("/track", async (IGeneral general) =>
   }
 });
 
-app.MapGet("/test2/", async (IGeneral general, IModelisation modelisation, double latitude, double longitude, int zoom = 14) =>
-{
-  var tile = general.GetTile(latitude, longitude, zoom);
-  var raster = await general.GetRaster(tile);
-  var coordinates = general.ExtractCoordinatesRelativesFromRaster(raster);
-  //var levels = modelisation.IndexElevationByXY(coordinates);
-  //modelisation.CreateTerrain(levels);
-  
-
-  return Results.Ok("ok");
-});
-
 
 
 app.MapGet("/mesh/", async (IGeneral general, IModelisation modelisation, double latitude, double longitude, int zoom = 14) =>
@@ -113,11 +101,28 @@ app.MapGet("/mesh/", async (IGeneral general, IModelisation modelisation, double
 
 
 
-app.MapGet("/tiles", (IGeneral general, double latitude, double longitude, int zoom) =>
+
+app.MapGet("/test2/", async (IGeneral general, IModelisation modelisation, double latitude, double longitude, int zoom = 14) =>
 {
   var tile = general.GetTile(latitude, longitude, zoom);
-  var url =
-    $"curl https://api.mapbox.com/v4/mapbox.satellite/{tile.Z}/{tile.X}/{tile.Y}@2x.png?access_token=pk.eyJ1IjoiZ3pvciIsImEiOiJjbTIwczk2MG8waGdqMmpzOHR2cjd2MDkwIn0.MC7S7t14bEbVQ7Tf3NdvVg --output \"test.png\"";
+  var raster = await general.GetRaster(tile);
+  var coordinates = general.ExtractCoordinatesRelativesFromRaster(raster);
+  //var levels = modelisation.IndexElevationByXY(coordinates);
+  //modelisation.CreateTerrain(levels);
+  
+
+  return Results.Ok("ok");
+});
+
+
+
+
+
+app.MapGet("/tiles", (IGeneral general, IConfiguration configuration, double latitude, double longitude, int zoom) =>
+{
+  var token = configuration["Secrets:MapBoxToken"];
+  var tile = general.GetTile(latitude, longitude, zoom);
+  var url = $"curl https://api.mapbox.com/v4/mapbox.satellite/{tile.Z}/{tile.X}/{tile.Y}@2x.png?access_token={token} --output test.png";
   return Results.Ok(url);
 });
 
@@ -125,6 +130,15 @@ app.MapGet("/tiles", (IGeneral general, double latitude, double longitude, int z
 
 
 app.Run();
+
+
+
+
+
+
+
+
+
 
 
 /*

@@ -12,8 +12,9 @@ public sealed class Modelisation : IModelisation
   /// <param name="elevationGrid">Grille 2D des altitudes (double).</param>
   /// <param name="step">Pas de filtrage pour le mesh (ex: 8 pour prendre un point sur 8).</param>
   /// <param name="tileSize"></param>
+  /// <param name="exageration"></param>
   /// <returns>Chaîne contenant le contenu du fichier OBJ.</returns>
-  public string CreateMesh(double[,] elevationGrid, double tileSize, int step = 1)
+  public string CreateMesh(double[,] elevationGrid, double tileSize, double exageration = 1.0, int step = 1)
   {
     var obj = new StringBuilder();
 
@@ -62,7 +63,7 @@ public sealed class Modelisation : IModelisation
         // Conversion en coordonnées relatives centrées
         var xf = (x - x0);
         var yf = (y - y0);
-        var zf = (z - zMin) / metersPerPixel;
+        var zf = (z - zMin) / metersPerPixel * exageration;
 
         obj.AppendLine($"v {xf.ToString(CultureInfo.InvariantCulture)} {zf.ToString(CultureInfo.InvariantCulture)} {yf.ToString(CultureInfo.InvariantCulture)}");
       }
