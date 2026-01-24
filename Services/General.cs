@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Cryptography.Xml;
 using System.Text;
 using Elevation.Interfaces.Services;
 using Elevation.Models;
@@ -140,13 +141,7 @@ public class General(HttpClient httpClient, IConfiguration configuration) : IGen
   }
 
 
-  /// <summary>
-  /// Arrondit une valeur à un multiple donné.
-  /// </summary>
-  /// <param name="value"></param>
-  /// <param name="step"></param>
-  /// <returns></returns>
-  public double RoundElevation(double value, double step) => Math.Round(value / step) * step;
+  
   
   
   /// <summary>
@@ -154,27 +149,25 @@ public class General(HttpClient httpClient, IConfiguration configuration) : IGen
   /// </summary>
   /// <param name="raster"></param>
   /// <returns></returns>
-  public double[,] ExtractCoordinatesRelativesFromRaster(Image<Rgba32> raster)
+  public double[,] ExtractCoordinatesFromRaster(Image<Rgba32> raster)
   {
-    int width = raster.Width;
-    int height = raster.Height;
+    var width = raster.Width;
+    var height = raster.Height;
 
-    // Création de la grille 2D
-    double[,] elevationGrid = new double[width, height];
+    double[,] heightMap = new double[width, height];
 
-    for (int y = 0; y < height; y++)
+    for (var y = 0; y < height; y++)
     {
-      for (int x = 0; x < width; x++)
+      for (var x = 0; x < width; x++)
       {
         var color = raster[x, y];
-
-        // Conversion de la couleur en altitude (double)
-        elevationGrid[x, y] = GetElevation(color);
+        heightMap[x, y] = GetElevation(color);
       }
     }
 
-    return elevationGrid;
+    return heightMap;
   }
+  
   
   
   /// <summary>

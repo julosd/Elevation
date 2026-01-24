@@ -13,5 +13,5 @@ public interface IGeneral
   double GetElevation(Rgba32 c);
   Pixel GetPixel(Image<Rgba32> raster, double latitude, double longitude, int zoom);
   Task<List<Coordinates>> GetElevation(List<Coordinates> coordinatesList);
-  double[,] ExtractCoordinatesRelativesFromRaster(Image<Rgba32> raster);
+  double[,] ExtractCoordinatesFromRaster(Image<Rgba32> raster);
 }

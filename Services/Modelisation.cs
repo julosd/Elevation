@@ -6,7 +6,274 @@ namespace Elevation.Services;
 
 public sealed class Modelisation : IModelisation
 {
+
   /// <summary>
+  /// Crée un mesh OBJ à partir d'un raster représenté sous forme de grille 2D.
+  /// </summary>
+  /// <param name="heightMap">Grille 2D des altitudes (double).</param>
+  /// <param name="options"></param>
+  /// <param name="parameters"></param>
+  /// <returns>Chaîne contenant le contenu du fichier OBJ.</returns>
+  public string CreateMesh
+  (
+    double[,] heightMap,
+    MeshOptions options,
+    MeshParameters parameters
+  )
+  {
+    var obj = new StringBuilder();
+    
+    
+    
+    var vertexIndex = 1;
+    var vertexIndices = new int[parameters.Size.Width, parameters.Size.Height];
+    
+    
+    // Boucle sur la grille avec filtrage
+    for (var x = 0; x < parameters.Size.Width - options.LateralStep; x += options.LateralStep)
+    {
+      for (var y = 0; y < parameters.Size.Height - options.LateralStep; y += options.LateralStep)
+      {
+        // Conversion en coordonnées relatives centrées
+        var xf = (x - parameters.Center.X);
+        var yf = (y -  parameters.Center.Y);
+        var zf = (RoundElevation(heightMap[x, y], options.TopographyStep) - parameters.ElevationScale.Min) /
+                 parameters.MetersPerPixel *
+                 options.Exaggeration;
+
+        obj.AppendLine(
+          $"v {xf.ToString(CultureInfo.InvariantCulture)} " +
+          $"{zf.ToString(CultureInfo.InvariantCulture)} " +
+          $"{yf.ToString(CultureInfo.InvariantCulture)}");
+        vertexIndices[x, y] = vertexIndex++;
+      }
+    }
+    
+    
+    Console.WriteLine("topo step : " + options.TopographyStep);
+    Console.WriteLine("elevation min " + parameters.ElevationScale.Min);
+    Console.WriteLine("mpp : " + parameters.MetersPerPixel);
+    Console.WriteLine("ex : " + options.Exaggeration);
+
+    for (var x = 0; x < parameters.Size.Width - options.LateralStep; x += options.LateralStep)
+    {
+      for (var y = 0; y < parameters.Size.Height - options.LateralStep; y += options.LateralStep)
+      {
+        int v1 = vertexIndices[x, y];
+        int v2 = vertexIndices[x + options.LateralStep, y];
+        int v3 = vertexIndices[x, y + options.LateralStep];
+        int v4 = vertexIndices[x + options.LateralStep, y + options.LateralStep];
+
+        // Triangle 1
+        obj.AppendLine($"f {v1} {v2} {v3}");
+
+        // Triangle 2
+        obj.AppendLine($"f {v2} {v4} {v3}");
+      }
+    }
+
+
+    // Sauvegarde du fichier
+    File.WriteAllText("mesh.obj", obj.ToString());
+
+    return obj.ToString();
+  }
+
+
+  public Dictionary<int, double[,]> CreateLevel(double[,] heightmap, int step)
+  {
+    var width = heightmap.GetLength(0);
+    var height = heightmap.GetLength(1);
+
+    var elevationsScale = GetElevationsScale(heightmap, width, height, step);
+
+    var results = new Dictionary<int, double[,]>();
+
+    for (var z = (int)elevationsScale.Min; z <= (int)elevationsScale.Max; z += step)
+    {
+      Console.WriteLine($"Elevation scale: {z}");
+      // Créer la heightmap vide pour ce niveau
+      results[z] = new double[width, height];
+
+      // Remplir les points présents à ce niveau
+      for (int x = 0; x < width; x++)
+      {
+        for (int y = 0; y < height; y++)
+        {
+          // Ici, on ne copie que si le point est à ce niveau
+          if ((int)RoundElevation(heightmap[x, y], step) == z)
+          {
+            results[z][x, y] = heightmap[x, y];
+          }
+        }
+      }
+    }
+
+    return results;
+  }
+
+
+  /// <summary>
+  /// Arrondit une valeur à un multiple donné.
+  /// </summary>
+  /// <param name="value"></param>
+  /// <param name="step"></param>
+  /// <returns></returns>
+  private static double RoundElevation(double value, double step = 25.0) => Math.Round(value / step) * step;
+
+
+  /// <summary>
+  /// Retourne les bornes minamale et maximal d'une height map
+  /// </summary>
+  /// <param name="heightMap"></param>
+  /// <param name="width"></param>
+  /// <param name="height"></param>
+  /// <param name="step"></param>
+  /// <returns></returns>
+  public static (double Min, double Max) GetElevationsScale(double[,] heightMap, int width, int height, int step)
+  {
+    var min = double.MaxValue;
+    var max = double.MinValue;
+
+    for (var x = 0; x < width; x++)
+    {
+      for (var y = 0; y < height; y++)
+      {
+        var z = heightMap[x, y];
+
+        var zMinStep = Math.Floor(z / step) * step;
+        if (zMinStep < min) min = zMinStep;
+
+        var zMaxStep = Math.Ceiling(z / step) * step;
+        if (zMaxStep > max) max = zMaxStep;
+      }
+    }
+
+    return (min, max);
+  }
+}
+
+
+/*
+/// </summary>
+/// <param name="elevationGrid">Grille 2D des altitudes (double).</param>
+/// <param name="step">Pas de filtrage pour le mesh (ex: 8 pour prendre un point sur 8).</param>
+/// <param name="tileSize"></param>
+/// <param name="exageration"></param>
+/// <returns>Chaîne contenant le contenu du fichier OBJ.</returns>
+public string CreateMesh(double[,] elevationGrid, double tileSize, double exageration = 1.0, int step = 1)
+{
+var obj = new StringBuilder();
+
+var width = elevationGrid.GetLength(0);
+var height = elevationGrid.GetLength(1);
+
+// Calcul du minimum et maximum d'altitude pour normalisation
+var zMin = double.MaxValue;
+var zMax = double.MinValue;
+
+for (var x = 0; x < width; x++)
+{
+for (var y = 0; y < height; y++)
+{
+var z = elevationGrid[x, y];
+if (z < zMin) zMin = z;
+if (z > zMax) zMax = z;
+}
+}
+
+// Centre de la grille pour centrer le mesh
+var x0 = width / 2.0;
+var y0 = height / 2.0;
+
+// Conversion en mètres pour chaque “pixel” de la grille
+var metersPerPixel = tileSize / width;
+
+// Échelle de la hauteur : on veut que la différence zMax-zMin corresponde
+// à la même proportion que la taille horizontale d'un pixel
+var heightScale = (zMax - zMin) / metersPerPixel; // ratio réel
+if (heightScale == 0) heightScale = 1.0; // éviter division par zéro
+
+Console.WriteLine($"Tile size (m)           : {tileSize}");
+Console.WriteLine($"Altitude max (m)        : {zMax}");
+Console.WriteLine($"Altitude range (m)      : {zMax - zMin}");
+Console.WriteLine($"Height scale (unit/m)   : {heightScale}");
+Console.WriteLine($"Meters per pixel (m/px) : {metersPerPixel}");
+
+var previousElevation = 0.0;
+// Boucle sur la grille avec filtrage
+for (var x = 0; x < width; x += step)
+{
+for (var y = 0; y < height; y += step)
+{
+var currentElevation = elevationGrid[x, y];
+
+
+
+previousElevation = currentElevation;
+
+// Conversion en coordonnées relatives centrées
+var xf = (x - x0);
+var yf = (y - y0);
+var zf = (currentElevation - zMin) / metersPerPixel * exageration;
+
+obj.AppendLine($"v {xf.ToString(CultureInfo.InvariantCulture)} {zf.ToString(CultureInfo.InvariantCulture)} {yf.ToString(CultureInfo.InvariantCulture)}");
+}
+}
+
+
+
+
+
+
+
+for (int y = 0; y < height - 1; y++)
+{
+for (int x = 0; x < width - 1; x++)
+{
+int i = y * width + x + 1; // +1 car OBJ est 1-based
+
+int iRight = i + 1;
+int iDown = i + width;
+int iDownRight = iDown + 1;
+
+// Triangle 1
+obj.AppendLine($"f {i} {iDown} {iRight}");
+
+// Triangle 2
+obj.AppendLine($"f {iRight} {iDown} {iDownRight}");
+}
+}
+
+File.WriteAllText("terrain.obj", obj.ToString());
+
+// Sauvegarde du fichier
+File.WriteAllText("mesh.obj", obj.ToString());
+
+return obj.ToString();
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+AVEC PALLIER
+/// <summary>
   /// Crée un mesh OBJ à partir d'un raster représenté sous forme de grille 2D.
   /// </summary>
   /// <param name="elevationGrid">Grille 2D des altitudes (double).</param>
@@ -38,7 +305,7 @@ public sealed class Modelisation : IModelisation
     // Centre de la grille pour centrer le mesh
     var x0 = width / 2.0;
     var y0 = height / 2.0;
-    
+
     // Conversion en mètres pour chaque “pixel” de la grille
     var metersPerPixel = tileSize / width;
 
@@ -46,28 +313,44 @@ public sealed class Modelisation : IModelisation
     // à la même proportion que la taille horizontale d'un pixel
     var heightScale = (zMax - zMin) / metersPerPixel; // ratio réel
     if (heightScale == 0) heightScale = 1.0; // éviter division par zéro
-    
+
     Console.WriteLine($"Tile size (m)           : {tileSize}");
     Console.WriteLine($"Altitude max (m)        : {zMax}");
     Console.WriteLine($"Altitude range (m)      : {zMax - zMin}");
     Console.WriteLine($"Height scale (unit/m)   : {heightScale}");
     Console.WriteLine($"Meters per pixel (m/px) : {metersPerPixel}");
 
+    var elevation = 0.0;
     // Boucle sur la grille avec filtrage
-    for (var x = 0; x < width; x += step)
+    for (var x = 0; x < width - step; x += step)
     {
-      for (var y = 0; y < height; y += step)
+      for (var y = 0; y < height - step; y += step)
       {
-        var z = elevationGrid[x, y];
+        var a = RoundElevation(elevationGrid[x, y]);
+        var b = RoundElevation(elevationGrid[x + step, y]);
+        var c = RoundElevation(elevationGrid[x + step, y + step]);
+        var d = RoundElevation(elevationGrid[x, y + step]);
+        /*
+        var a = (elevationGrid[x, y]);
+        var b = (elevationGrid[x + step, y]);
+        var c = (elevationGrid[x + step, y + step]);
+        var d = (elevationGrid[x, y + step]);
+        * /
+        if (a < b) continue;
+
+        elevation = a;
 
         // Conversion en coordonnées relatives centrées
         var xf = (x - x0);
         var yf = (y - y0);
-        var zf = (z - zMin) / metersPerPixel * exageration;
+        var zf = (elevation - zMin) / metersPerPixel * exageration;
 
-        obj.AppendLine($"v {xf.ToString(CultureInfo.InvariantCulture)} {zf.ToString(CultureInfo.InvariantCulture)} {yf.ToString(CultureInfo.InvariantCulture)}");
+        obj.AppendLine(
+          $"v {xf.ToString(CultureInfo.InvariantCulture)} {zf.ToString(CultureInfo.InvariantCulture)} {yf.ToString(CultureInfo.InvariantCulture)}");
       }
     }
+
+    File.WriteAllText("terrain.obj", obj.ToString());
 
     // Sauvegarde du fichier
     File.WriteAllText("mesh.obj", obj.ToString());
@@ -80,58 +363,10 @@ public sealed class Modelisation : IModelisation
 
 
 
-  public Dictionary<double, List<Coordinates>> CreateLevel(List<Coordinates> coordinates)
-  {
-    const double step = 10.0;
 
-    return coordinates
-      .GroupBy(c => Math.Floor(c.Altitude / step) * step)
-      .OrderBy(g => g.Key)
-      .ToDictionary(
-        g => g.Key,
-        g => g.ToList()
-      );
-  }
-  
-  
-  
-  /// <summary>
-  /// Renvoi les coordonnées identifiables avec un (x et y) 
-  /// </summary>
-  /// <param name="coordinates"></param>
-  /// <returns></returns>
-  public Dictionary<(int X, int Y), int> IndexElevationByXY(IEnumerable<Coordinates> coordinates)
-  {
-    return coordinates.ToDictionary(
-      c => ((int)c.Latitude, (int)c.Longitude),
-      c => (int)c.Altitude
-    );
-  }
-
-  
-  
-  
-
-  public void CreateTerrain(Dictionary<double, List<Coordinates>> levels)
-  {
-    var obj = new StringBuilder();
-    var inv = CultureInfo.InvariantCulture;
-    Console.WriteLine(levels.Keys.Count);
-    foreach (var (altitude, coordonnees) in levels.OrderBy(c => c.Key))
-    {
-      if (altitude == 1200.0)
-      {
-        var coordinatesEnumerable = coordonnees.OrderBy(c => c.Latitude).ThenBy(c => c.Longitude);
-        foreach (var c in coordinatesEnumerable)
-        {
-          var x = (c.Latitude - 128);
-          var y = (c.Longitude - 128);
-          var z = (c.Altitude - 1000.0) / 64;
-
-          obj.AppendLine($"v {(x).ToString(inv)} {z.ToString(inv)} {y.ToString(inv)}");
-        }
-      }
-    }
-    File.WriteAllText("levels.obj", obj.ToString());
-  }
-}
+    Console.WriteLine($"Tile size (m)           : {tileSize}");
+    Console.WriteLine($"Altitude max (m)        : {elevationsScale.Max}");
+    Console.WriteLine($"Altitude range (m)      : {elevationsScale.Max - elevationsScale.Min}");
+    Console.WriteLine($"Height scale (unit/m)   : {heightScale}");
+    Console.WriteLine($"Meters per pixel (m/px) : {mpp}");
+*/

@@ -44,6 +44,12 @@ app.MapGet("/elevation", async (IGeneral general, double latitude, double longit
 });
 #endregion
 
+
+
+
+
+
+
 app.MapGet("/track", async (IGeneral general) =>
 {
   try
@@ -88,17 +94,37 @@ app.MapGet("/track", async (IGeneral general) =>
 
 
 
-app.MapGet("/mesh/", async (IGeneral general, IModelisation modelisation, double latitude, double longitude, int zoom = 14) =>
+app.MapGet("/mesh/", async (IGeneral general, IModelisation modelisation, double latitude, double longitude, int zoom = 14, int topographyStep = 1) =>
 {
+  Console.WriteLine("Récupération de la tuile...");
   var tile = general.GetTile(latitude, longitude, zoom);
-  var tileSize = general.GetTileSize(latitude, zoom);
+  Console.WriteLine("Récupération du raster...");
   var raster = await general.GetRaster(tile);
-  var coordinates = general.ExtractCoordinatesRelativesFromRaster(raster);
-  var mesh = modelisation.CreateMesh(coordinates, tileSize);
+  Console.WriteLine("Extraction des coordonnées...");
+  var coordinates = general.ExtractCoordinatesFromRaster(raster);
+  
+  Console.WriteLine("Création des options...");
+  var options = new MeshOptions(topographyStep, exaggeration: 1, 1);
+  Console.WriteLine("Création des paramètres...");
+  var parameters = new MeshParameters(latitude, zoom, coordinates, topographyStep);
+  Console.WriteLine("Création de la mesh...");
+  var mesh = modelisation.CreateMesh(coordinates, options, parameters);
 
   return Results.Ok("ok");
 });
 
+
+app.MapGet("/mesh-z/", async (IGeneral general, IModelisation modelisation, double latitude, double longitude, int zoom = 14, int topographyStep = 1) =>
+{
+  var tile = general.GetTile(latitude, longitude, zoom);
+  var tileSize = general.GetTileSize(latitude, zoom);
+  var raster = await general.GetRaster(tile);
+  var coordinates = general.ExtractCoordinatesFromRaster(raster);
+  var topo = modelisation.CreateLevel(coordinates, topographyStep);
+  //var mesh = modelisation.CreateMesh(topo[4240], tileSize, new MeshOptions(topographyStep: topographyStep));
+
+  return Results.Ok("ok");
+});
 
 
 
@@ -106,7 +132,7 @@ app.MapGet("/test2/", async (IGeneral general, IModelisation modelisation, doubl
 {
   var tile = general.GetTile(latitude, longitude, zoom);
   var raster = await general.GetRaster(tile);
-  var coordinates = general.ExtractCoordinatesRelativesFromRaster(raster);
+  var coordinates = general.ExtractCoordinatesFromRaster(raster);
   //var levels = modelisation.IndexElevationByXY(coordinates);
   //modelisation.CreateTerrain(levels);
   
