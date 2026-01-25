@@ -167,6 +167,59 @@ public class General(HttpClient httpClient, IConfiguration configuration) : IGen
 
     return heightMap;
   }
+
+  public double[,] AddCoordinates(double[,] heightMap)
+  {
+    int width = heightMap.GetLength(0);
+    int height = heightMap.GetLength(1);
+
+    int newWidth = width * 2 - 1;
+    int newHeight = height * 2 - 1;
+
+    var result = new double[newWidth, newHeight];
+
+    for (int x = 0; x < width - 1; x++)
+    {
+      for (int y = 0; y < height - 1; y++)
+      {
+        double a = heightMap[x, y];
+        double b = heightMap[x + 1, y];
+        double c = heightMap[x, y + 1];
+        double d = heightMap[x + 1, y + 1];
+
+        int nx = x * 2;
+        int ny = y * 2;
+
+        // point original
+        result[nx, ny] = a;
+
+        // milieu horizontal
+        result[nx + 1, ny] = (a + b) / 2.0;
+
+        // milieu vertical
+        result[nx, ny + 1] = (a + c) / 2.0;
+
+        // centre (bilinéaire)
+        result[nx + 1, ny + 1] = (a + b + c + d) / 4.0;
+      }
+    }
+
+    // dernière ligne
+    for (int x = 0; x < width - 1; x++)
+      result[x * 2, (height - 1) * 2] = heightMap[x, height - 1];
+
+    // dernière colonne
+    for (int y = 0; y < height - 1; y++)
+      result[(width - 1) * 2, y * 2] = heightMap[width - 1, y];
+
+    // dernier point
+    result[(width - 1) * 2, (height - 1) * 2] =
+      heightMap[width - 1, height - 1];
+
+    return result;
+  }
+
+
   
   
   

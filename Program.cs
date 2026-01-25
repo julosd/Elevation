@@ -96,18 +96,15 @@ app.MapGet("/track", async (IGeneral general) =>
 
 app.MapGet("/mesh/", async (IGeneral general, IModelisation modelisation, double latitude, double longitude, int zoom = 14, int topographyStep = 1) =>
 {
-  Console.WriteLine("Récupération de la tuile...");
   var tile = general.GetTile(latitude, longitude, zoom);
-  Console.WriteLine("Récupération du raster...");
   var raster = await general.GetRaster(tile);
-  Console.WriteLine("Extraction des coordonnées...");
   var coordinates = general.ExtractCoordinatesFromRaster(raster);
+  //coordinates = general.AddCoordinates(coordinates);
+  //coordinates = general.AddCoordinates(coordinates);
+  //coordinates = general.AddCoordinates(coordinates);
   
-  Console.WriteLine("Création des options...");
   var options = new MeshOptions(topographyStep, exaggeration: 1, 1);
-  Console.WriteLine("Création des paramètres...");
   var parameters = new MeshParameters(latitude, zoom, coordinates, topographyStep);
-  Console.WriteLine("Création de la mesh...");
   var mesh = modelisation.CreateMesh(coordinates, options, parameters);
 
   return Results.Ok("ok");
@@ -120,8 +117,13 @@ app.MapGet("/mesh-z/", async (IGeneral general, IModelisation modelisation, doub
   var tileSize = general.GetTileSize(latitude, zoom);
   var raster = await general.GetRaster(tile);
   var coordinates = general.ExtractCoordinatesFromRaster(raster);
-  var topo = modelisation.CreateLevel(coordinates, topographyStep);
-  //var mesh = modelisation.CreateMesh(topo[4240], tileSize, new MeshOptions(topographyStep: topographyStep));
+  var levels = modelisation.CreateLevel(coordinates, topographyStep);
+  
+  var options = new MeshOptions(topographyStep, exaggeration: 1, 1);
+  var parameters = new MeshParameters(latitude, zoom, coordinates, topographyStep);
+  var mesh = modelisation.CreateMesh2(levels, options, parameters);
+  
+  Console.WriteLine("ok");
 
   return Results.Ok("ok");
 });
