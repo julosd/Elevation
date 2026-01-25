@@ -76,6 +76,8 @@ public sealed class Modelisation : IModelisation
   {
     Console.WriteLine("Création du mesh.");
     var obj = new StringBuilder();
+    var vertexIndex = 1;
+    var vertexIndices = new int[parameters.Size.Width, parameters.Size.Height];
 
     for (var z = (int)parameters.ElevationScale.Min; z < parameters.ElevationScale.Max; z += options.TopographyStep)
     {
@@ -95,7 +97,25 @@ public sealed class Modelisation : IModelisation
             $"v {xf.ToString(CultureInfo.InvariantCulture)} " +
             $"{elevation.ToString(CultureInfo.InvariantCulture)} " +
             $"{yf.ToString(CultureInfo.InvariantCulture)}");
+          vertexIndices[x, y] = vertexIndex++;
         }
+      }
+    }
+
+    for (var x = 0; x < parameters.Size.Width - options.LateralStep; x += options.LateralStep)
+    {
+      for (var y = 0; y < parameters.Size.Height - options.LateralStep; y += options.LateralStep)
+      {
+        int v1 = vertexIndices[x, y];
+        int v2 = vertexIndices[x + options.LateralStep, y];
+        int v3 = vertexIndices[x, y + options.LateralStep];
+        int v4 = vertexIndices[x + options.LateralStep, y + options.LateralStep];
+
+        // Triangle 1
+        //obj.AppendLine($"f {v1} {v2} {v3}");
+
+        // Triangle 2
+        //obj.AppendLine($"f {v2} {v4} {v3}");
       }
     }
 
@@ -128,9 +148,8 @@ public sealed class Modelisation : IModelisation
         }
       }
     }
-    
-    
-    
+
+
     results = Extrusion(results, step, scale);
 
     return results;
@@ -145,28 +164,26 @@ public sealed class Modelisation : IModelisation
     var height = points.GetLength(1);
     //var scale = GetElevationsScale(points, width, height, step);
 
-
-    for (var z = (int)scale.Min ; z < scale.Max; z += step)
+    for (var x = 1; x < width - 2; x++)
     {
-      for (var x = 1; x < width - 2; x++)
+      for (var y = 1; y < height - 2; y++)
       {
-        for (var y = 1; y < height - 2; y++)
+        for (var z = (int)scale.Min; z < scale.Max; z += step)
         {
           if (z == (int)scale.Min) continue;
-          var n = (X: x, Y: y + 1, Z: z + 2);
-          var ne = (X: x + 1, Y: y + 1, Z: z + 2);
-          var e = (X: x + 1, Y: y, Z: z + 2);
-          var se = (X: x + 1, Y: y - 1, Z: z + 2);
-          var s = (X: x, Y: y - 1, Z: z + 2);
-          var so = (X: x - 1, Y: y - 1, Z: z + 2);
-          var o = (X: x - 1, Y: y, Z: z + 2);
-          var no = (X: x - 1, Y: y + 1, Z: z + 2);
-          
+          var n = (X: x, Y: y + 1, Z: z + 1);
+          var ne = (X: x + 1, Y: y + 1, Z: z + 1);
+          var e = (X: x + 1, Y: y, Z: z + 1);
+          var se = (X: x + 1, Y: y - 1, Z: z + 1);
+          var s = (X: x, Y: y - 1, Z: z + 1);
+          var so = (X: x - 1, Y: y - 1, Z: z + 1);
+          var o = (X: x - 1, Y: y, Z: z + 1);
+          var no = (X: x - 1, Y: y + 1, Z: z + 1);
 
 
           if (
-            points[x,y,z] is (true, false) ||
-            points[x,y,z+1] is (true, false) ||
+            points[x, y, z] is (true, false) ||
+            points[x, y, z + 1] is (true, false) ||
             points[n.X, n.Y, n.Z] is (true, false) ||
             points[ne.X, ne.Y, ne.Z] is (true, false) ||
             points[e.X, e.Y, e.Z] is (true, false) ||
@@ -175,13 +192,17 @@ public sealed class Modelisation : IModelisation
             points[so.X, so.Y, so.Z] is (true, false) ||
             points[o.X, o.Y, o.Z] is (true, false) ||
             points[no.X, no.Y, no.Z] is (true, false) //
-          ) continue;
-          
-          points[x, y, z] = (false, false);
+          )
+          {
+            Console.WriteLine($"Break à : {x}, {y}, {z}");
+            break;
+          }
 
+          points[x, y, z] = (false, false);
         }
       }
     }
+
     return points;
   }
 
