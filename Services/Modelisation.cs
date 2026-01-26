@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Numerics;
 using System.Text;
 using Elevation.Models;
 
@@ -78,6 +79,7 @@ public sealed class Modelisation : IModelisation
     var obj = new StringBuilder();
     var vertexIndex = 1;
     var vertexIndices = new int[parameters.Size.Width, parameters.Size.Height];
+    var index = 1;
 
     for (var z = (int)parameters.ElevationScale.Min; z < parameters.ElevationScale.Max; z += options.TopographyStep)
     {
@@ -93,29 +95,14 @@ public sealed class Modelisation : IModelisation
           var xf = (x - parameters.Center.X);
           var yf = (y - parameters.Center.Y);
 
-          obj.AppendLine(
-            $"v {xf.ToString(CultureInfo.InvariantCulture)} " +
-            $"{elevation.ToString(CultureInfo.InvariantCulture)} " +
-            $"{yf.ToString(CultureInfo.InvariantCulture)}");
-          vertexIndices[x, y] = vertexIndex++;
+          //obj.AppendLine(
+          //  $"v {xf.ToString(CultureInfo.InvariantCulture)} " +
+          //  $"{elevation.ToString(CultureInfo.InvariantCulture)} " +
+          //  $"{yf.ToString(CultureInfo.InvariantCulture)}");
+
+          //if (x % 2 == 0 && y % 2 == 0) CreateVoxel((xf, yf, elevation), obj, ref index);
+          CreateVoxel((xf, yf, elevation), obj, ref index);
         }
-      }
-    }
-
-    for (var x = 0; x < parameters.Size.Width - options.LateralStep; x += options.LateralStep)
-    {
-      for (var y = 0; y < parameters.Size.Height - options.LateralStep; y += options.LateralStep)
-      {
-        int v1 = vertexIndices[x, y];
-        int v2 = vertexIndices[x + options.LateralStep, y];
-        int v3 = vertexIndices[x, y + options.LateralStep];
-        int v4 = vertexIndices[x + options.LateralStep, y + options.LateralStep];
-
-        // Triangle 1
-        //obj.AppendLine($"f {v1} {v2} {v3}");
-
-        // Triangle 2
-        //obj.AppendLine($"f {v2} {v4} {v3}");
       }
     }
 
@@ -123,6 +110,57 @@ public sealed class Modelisation : IModelisation
 
     return obj.ToString();
   }
+
+  public void CreateVoxel((int x, int y, int z) center, StringBuilder obj, ref int index)
+{
+    var halfSize = .5f;
+
+    var offsets = new[]
+    {
+      new Vector3(-halfSize, -halfSize, -halfSize), // BLB  Bottom Left Back
+      new Vector3( halfSize, -halfSize, -halfSize), // BRB  Bottom Right Back
+      new Vector3(-halfSize,  halfSize, -halfSize), // TLB  Top Left Back
+      new Vector3( halfSize,  halfSize, -halfSize), // TRB  Top Right Back
+      new Vector3(-halfSize, -halfSize,  halfSize), // BLF  Bottom Left Front
+      new Vector3( halfSize, -halfSize,  halfSize), // BRF  Bottom Right Front
+      new Vector3(-halfSize,  halfSize,  halfSize), // TLF  Top Left Front
+      new Vector3( halfSize,  halfSize,  halfSize)  // TRF  Top Right Front
+    };
+
+
+    // tableau pour stocker les indices des 8 sommets
+    int[] vertexIndices = new int[8];
+
+    for (var i = 0; i < 8; i++)
+    {
+        var px = center.x + offsets[i].X;
+        var py = center.y + offsets[i].Y;
+        var pz = center.z + offsets[i].Z;
+
+        obj.AppendLine(
+            $"v {px.ToString(CultureInfo.InvariantCulture)} " +
+            $"{pz.ToString(CultureInfo.InvariantCulture)} " +
+            $"{py.ToString(CultureInfo.InvariantCulture)}");
+
+        vertexIndices[i] = index;
+        index++; // incrémente l’index global pour le prochain sommet
+    }
+
+    obj.AppendLine($"f {vertexIndices[4]} {vertexIndices[5]} {vertexIndices[7]} {vertexIndices[6]}"); // Front
+    obj.AppendLine($"f {vertexIndices[0]} {vertexIndices[1]} {vertexIndices[3]} {vertexIndices[2]}"); // Back
+    obj.AppendLine($"f {vertexIndices[2]} {vertexIndices[3]} {vertexIndices[7]} {vertexIndices[6]}"); // Top
+    obj.AppendLine($"f {vertexIndices[0]} {vertexIndices[1]} {vertexIndices[5]} {vertexIndices[4]}"); // Bottom
+    obj.AppendLine($"f {vertexIndices[0]} {vertexIndices[2]} {vertexIndices[6]} {vertexIndices[4]}"); // Left
+    obj.AppendLine($"f {vertexIndices[1]} {vertexIndices[3]} {vertexIndices[7]} {vertexIndices[5]}"); // Right
+}
+
+
+
+  // Triangle 1
+  //obj.AppendLine($"f {v1} {v2} {v3}");
+
+  // Triangle 2
+  //obj.AppendLine($"f {v2} {v4} {v3}");
 
 
   public (bool HasPoint, bool HasPointAbove)[,,] CreateLevel(double[,] heightmap, int step)
@@ -194,7 +232,6 @@ public sealed class Modelisation : IModelisation
             points[no.X, no.Y, no.Z] is (true, false) //
           )
           {
-            Console.WriteLine($"Break à : {x}, {y}, {z}");
             break;
           }
 
