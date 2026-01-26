@@ -171,14 +171,14 @@ public sealed class Modelisation : IModelisation
         for (var z = (int)scale.Min; z < scale.Max; z += step)
         {
           if (z == (int)scale.Min) continue;
-          var n = (X: x, Y: y + 1, Z: z + 1);
-          var ne = (X: x + 1, Y: y + 1, Z: z + 1);
-          var e = (X: x + 1, Y: y, Z: z + 1);
-          var se = (X: x + 1, Y: y - 1, Z: z + 1);
-          var s = (X: x, Y: y - 1, Z: z + 1);
-          var so = (X: x - 1, Y: y - 1, Z: z + 1);
-          var o = (X: x - 1, Y: y, Z: z + 1);
-          var no = (X: x - 1, Y: y + 1, Z: z + 1);
+          var n = (X: x, Y: y + 1, Z: z + step);
+          var ne = (X: x + 1, Y: y + 1, Z: z + step);
+          var e = (X: x + 1, Y: y, Z: z + step);
+          var se = (X: x + 1, Y: y - 1, Z: z + step);
+          var s = (X: x, Y: y - 1, Z: z + step);
+          var so = (X: x - 1, Y: y - 1, Z: z + step);
+          var o = (X: x - 1, Y: y, Z: z + step);
+          var no = (X: x - 1, Y: y + 1, Z: z + step);
 
 
           if (
