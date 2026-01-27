@@ -72,7 +72,7 @@ public sealed class Modelisation : IModelisation
   }
 
 
-  public string CreateMesh2((bool HasPoint, bool HasPointAbove)[,,] levels, MeshOptions options,
+  public string CreateMesh2(Voxel[,,] levels, MeshOptions options,
     MeshParameters parameters)
   {
     Console.WriteLine("Création du mesh.");
@@ -87,7 +87,7 @@ public sealed class Modelisation : IModelisation
       {
         for (var y = 0; y < parameters.Size.Height - options.LateralStep; y += options.LateralStep)
         {
-          if (levels[x, y, z] is (false, false)) continue;
+          if (levels[x, y, z] is Voxel.Air) continue;
 
           var elevation = ComputeElevation(z, options, parameters);
 
@@ -101,7 +101,7 @@ public sealed class Modelisation : IModelisation
           //  $"{yf.ToString(CultureInfo.InvariantCulture)}");
 
           //if (x % 2 == 0 && y % 2 == 0) CreateVoxel((xf, yf, elevation), obj, ref index);
-          CreateVoxel((xf, yf, elevation), obj, ref index);
+          CreateCube((xf, yf, elevation), obj, ref index);
         }
       }
     }
@@ -111,20 +111,20 @@ public sealed class Modelisation : IModelisation
     return obj.ToString();
   }
 
-  public void CreateVoxel((int x, int y, int z) center, StringBuilder obj, ref int index)
-{
+  public void CreateCube((int x, int y, int z) center, StringBuilder obj, ref int index)
+  {
     var halfSize = .5f;
 
     var offsets = new[]
     {
       new Vector3(-halfSize, -halfSize, -halfSize), // BLB  Bottom Left Back
-      new Vector3( halfSize, -halfSize, -halfSize), // BRB  Bottom Right Back
-      new Vector3(-halfSize,  halfSize, -halfSize), // TLB  Top Left Back
-      new Vector3( halfSize,  halfSize, -halfSize), // TRB  Top Right Back
-      new Vector3(-halfSize, -halfSize,  halfSize), // BLF  Bottom Left Front
-      new Vector3( halfSize, -halfSize,  halfSize), // BRF  Bottom Right Front
-      new Vector3(-halfSize,  halfSize,  halfSize), // TLF  Top Left Front
-      new Vector3( halfSize,  halfSize,  halfSize)  // TRF  Top Right Front
+      new Vector3(halfSize, -halfSize, -halfSize), // BRB  Bottom Right Back
+      new Vector3(-halfSize, halfSize, -halfSize), // TLB  Top Left Back
+      new Vector3(halfSize, halfSize, -halfSize), // TRB  Top Right Back
+      new Vector3(-halfSize, -halfSize, halfSize), // BLF  Bottom Left Front
+      new Vector3(halfSize, -halfSize, halfSize), // BRF  Bottom Right Front
+      new Vector3(-halfSize, halfSize, halfSize), // TLF  Top Left Front
+      new Vector3(halfSize, halfSize, halfSize) // TRF  Top Right Front
     };
 
 
@@ -133,27 +133,29 @@ public sealed class Modelisation : IModelisation
 
     for (var i = 0; i < 8; i++)
     {
-        var px = center.x + offsets[i].X;
-        var py = center.y + offsets[i].Y;
-        var pz = center.z + offsets[i].Z;
+      var px = center.x + offsets[i].X;
+      var py = center.y + offsets[i].Y;
+      var pz = center.z + offsets[i].Z;
 
-        obj.AppendLine(
-            $"v {px.ToString(CultureInfo.InvariantCulture)} " +
-            $"{pz.ToString(CultureInfo.InvariantCulture)} " +
-            $"{py.ToString(CultureInfo.InvariantCulture)}");
+      obj.AppendLine(
+        $"v {px.ToString(CultureInfo.InvariantCulture)} " +
+        $"{pz.ToString(CultureInfo.InvariantCulture)} " +
+        $"{py.ToString(CultureInfo.InvariantCulture)}");
 
-        vertexIndices[i] = index;
-        index++; // incrémente l’index global pour le prochain sommet
+      vertexIndices[i] = index;
+      index++; // incrémente l’index global pour le prochain sommet
     }
 
+
+    /*
     obj.AppendLine($"f {vertexIndices[4]} {vertexIndices[5]} {vertexIndices[7]} {vertexIndices[6]}"); // Front
     obj.AppendLine($"f {vertexIndices[0]} {vertexIndices[1]} {vertexIndices[3]} {vertexIndices[2]}"); // Back
     obj.AppendLine($"f {vertexIndices[2]} {vertexIndices[3]} {vertexIndices[7]} {vertexIndices[6]}"); // Top
     obj.AppendLine($"f {vertexIndices[0]} {vertexIndices[1]} {vertexIndices[5]} {vertexIndices[4]}"); // Bottom
     obj.AppendLine($"f {vertexIndices[0]} {vertexIndices[2]} {vertexIndices[6]} {vertexIndices[4]}"); // Left
     obj.AppendLine($"f {vertexIndices[1]} {vertexIndices[3]} {vertexIndices[7]} {vertexIndices[5]}"); // Right
-}
-
+    */
+  }
 
 
   // Triangle 1
@@ -163,14 +165,14 @@ public sealed class Modelisation : IModelisation
   //obj.AppendLine($"f {v2} {v4} {v3}");
 
 
-  public (bool HasPoint, bool HasPointAbove)[,,] CreateLevel(double[,] heightmap, int step)
+  public Voxel[,,] CreateVoxels(double[,] heightmap, int step)
   {
-    Console.WriteLine("Création des palliers.");
+    Console.WriteLine("Conversion height map -> voxels.");
     var width = heightmap.GetLength(0);
     var height = heightmap.GetLength(1);
     var scale = GetElevationsScale(heightmap, width, height, step);
 
-    var results = new (bool HasPoint, bool HasPointAbove)[width, height, (int)scale.Max];
+    var results = new Voxel[width, height, (int)scale.Max];
 
     for (var z = (int)scale.Min; z < scale.Max; z += step)
     {
@@ -180,22 +182,25 @@ public sealed class Modelisation : IModelisation
         {
           var elevation = (int)RoundElevation(heightmap[x, y], step);
 
-          if (elevation == z) results[x, y, z] = (true, false);
-          else if (elevation < z) results[x, y, z] = (false, false);
-          else results[x, y, z] = (false, true);
+          if (elevation == z) results[x, y, z] = Voxel.Ground;
+          else if (elevation < z) results[x, y, z] = Voxel.Air;
+          else results[x, y, z] = Voxel.Underground;
         }
       }
     }
 
 
-    results = Extrusion(results, step, scale);
+    //results = Extrusion(results, step, scale);
 
     return results;
   }
 
+  private void VoxelSensor()
+  {
+  }
 
-  public (bool HasPoint, bool HasPointAbove)[,,] Extrusion((bool HasPoint, bool HasPointAbove)[,,] points, int step,
-    (double Min, double Max) scale)
+
+  public Voxel[,,] Extrusion(Voxel[,,] points, int step, (double Min, double Max) scale)
   {
     Console.WriteLine("Extrusion.");
     var width = points.GetLength(0);
@@ -209,33 +214,18 @@ public sealed class Modelisation : IModelisation
         for (var z = (int)scale.Min; z < scale.Max; z += step)
         {
           if (z == (int)scale.Min) continue;
+          var c = (X: x, Y: y, Z: z + step);
           var n = (X: x, Y: y + 1, Z: z + step);
-          var ne = (X: x + 1, Y: y + 1, Z: z + step);
           var e = (X: x + 1, Y: y, Z: z + step);
-          var se = (X: x + 1, Y: y - 1, Z: z + step);
           var s = (X: x, Y: y - 1, Z: z + step);
-          var so = (X: x - 1, Y: y - 1, Z: z + step);
           var o = (X: x - 1, Y: y, Z: z + step);
-          var no = (X: x - 1, Y: y + 1, Z: z + step);
 
 
-          if (
-            points[x, y, z] is (true, false) ||
-            points[x, y, z + 1] is (true, false) ||
-            points[n.X, n.Y, n.Z] is (true, false) ||
-            points[ne.X, ne.Y, ne.Z] is (true, false) ||
-            points[e.X, e.Y, e.Z] is (true, false) ||
-            points[se.X, se.Y, se.Z] is (true, false) ||
-            points[s.X, s.Y, s.Z] is (true, false) ||
-            points[so.X, so.Y, so.Z] is (true, false) ||
-            points[o.X, o.Y, o.Z] is (true, false) ||
-            points[no.X, no.Y, no.Z] is (true, false) //
-          )
-          {
-            break;
-          }
+          var abovePoints = new[] { c, n, e, s, o };
 
-          points[x, y, z] = (false, false);
+          if (abovePoints.Any(p => points[p.X, p.Y, p.Z] == Voxel.Ground)) break;
+
+          points[x, y, z] = Voxel.Void;
         }
       }
     }

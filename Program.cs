@@ -117,7 +117,7 @@ app.MapGet("/mesh-z/", async (IGeneral general, IModelisation modelisation, doub
   var tileSize = general.GetTileSize(latitude, zoom);
   var raster = await general.GetRaster(tile);
   var coordinates = general.ExtractCoordinatesFromRaster(raster);
-  var levels = modelisation.CreateLevel(coordinates, topographyStep);
+  var levels = modelisation.CreateVoxels(coordinates, topographyStep);
   
   var options = new MeshOptions(topographyStep, exaggeration: 1, 1);
   var parameters = new MeshParameters(latitude, zoom, coordinates, topographyStep);
