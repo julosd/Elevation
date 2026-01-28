@@ -46,7 +46,7 @@ public sealed class Modelisation : IModelisation
     Console.WriteLine("elevation min " + parameters.ElevationScale.Min);
     Console.WriteLine("mpp : " + parameters.MetersPerPixel);
     Console.WriteLine("ex : " + options.Exaggeration);
-    /*
+    
     for (var x = 0; x < parameters.Size.Width - options.LateralStep; x += options.LateralStep)
     {
       for (var y = 0; y < parameters.Size.Height - options.LateralStep; y += options.LateralStep)
@@ -63,7 +63,7 @@ public sealed class Modelisation : IModelisation
         obj.AppendLine($"f {v2} {v4} {v3}");
       }
     }
-    */
+    
 
     // Sauvegarde du fichier
     File.WriteAllText("mesh.obj", obj.ToString());
@@ -72,13 +72,12 @@ public sealed class Modelisation : IModelisation
   }
 
 
-  public string CreateMesh2(Voxel[,,] levels, MeshOptions options,
-    MeshParameters parameters)
+  public string CreateMesh2(Voxel[,,] voxels, MeshOptions options, MeshParameters parameters)
   {
     Console.WriteLine("Création du mesh.");
     var obj = new StringBuilder();
-    var vertexIndex = 1;
-    var vertexIndices = new int[parameters.Size.Width, parameters.Size.Height];
+    //var vertexIndex = 1;
+    //var vertexIndices = new int[parameters.Size.Width, parameters.Size.Height];
     var index = 1;
 
     for (var z = (int)parameters.ElevationScale.Min; z < parameters.ElevationScale.Max; z += options.TopographyStep)
@@ -87,7 +86,8 @@ public sealed class Modelisation : IModelisation
       {
         for (var y = 0; y < parameters.Size.Height - options.LateralStep; y += options.LateralStep)
         {
-          if (levels[x, y, z] is Voxel.Air) continue;
+          if (voxels[x, y, z] is Voxel.Air) continue;
+          if (voxels[x, y, z] is Voxel.Void) continue;
 
           var elevation = ComputeElevation(z, options, parameters);
 
@@ -101,7 +101,7 @@ public sealed class Modelisation : IModelisation
           //  $"{yf.ToString(CultureInfo.InvariantCulture)}");
 
           //if (x % 2 == 0 && y % 2 == 0) CreateVoxel((xf, yf, elevation), obj, ref index);
-          CreateCube((xf, yf, elevation), obj, ref index);
+          CreateCube((xf, yf, elevation), voxels, obj, ref index);
         }
       }
     }
@@ -111,9 +111,9 @@ public sealed class Modelisation : IModelisation
     return obj.ToString();
   }
 
-  public void CreateCube((int x, int y, int z) center, StringBuilder obj, ref int index)
+  private static void CreateCube((int x, int y, int z) center, Voxel[,,] voxels, StringBuilder obj, ref int index)
   {
-    var halfSize = .5f;
+    const float halfSize = .5f;
 
     var offsets = new[]
     {
@@ -129,7 +129,7 @@ public sealed class Modelisation : IModelisation
 
 
     // tableau pour stocker les indices des 8 sommets
-    int[] vertexIndices = new int[8];
+    var vertexIndices = new int[8];
 
     for (var i = 0; i < 8; i++)
     {
@@ -145,7 +145,8 @@ public sealed class Modelisation : IModelisation
       vertexIndices[i] = index;
       index++; // incrémente l’index global pour le prochain sommet
     }
-
+    
+    //if (center.z == 0) obj.AppendLine($"f {vertexIndices[0]} {vertexIndices[1]} {vertexIndices[4]} {vertexIndices[5]}"); 
 
     /*
     obj.AppendLine($"f {vertexIndices[4]} {vertexIndices[5]} {vertexIndices[7]} {vertexIndices[6]}"); // Front
@@ -190,13 +191,9 @@ public sealed class Modelisation : IModelisation
     }
 
 
-    //results = Extrusion(results, step, scale);
+    results = Extrusion(results, step, scale);
 
     return results;
-  }
-
-  private void VoxelSensor()
-  {
   }
 
 
@@ -211,21 +208,23 @@ public sealed class Modelisation : IModelisation
     {
       for (var y = 1; y < height - 2; y++)
       {
-        for (var z = (int)scale.Min; z < scale.Max; z += step)
+        for (var z = (int)scale.Min + step; z < scale.Max - 2 * step; z += step)
         {
-          if (z == (int)scale.Min) continue;
-          var c = (X: x, Y: y, Z: z + step);
+          var c = (X: x, Y: y, Z: z + 2 * step);
           var n = (X: x, Y: y + 1, Z: z + step);
           var e = (X: x + 1, Y: y, Z: z + step);
           var s = (X: x, Y: y - 1, Z: z + step);
           var o = (X: x - 1, Y: y, Z: z + step);
 
-
-          var abovePoints = new[] { c, n, e, s, o };
-
-          if (abovePoints.Any(p => points[p.X, p.Y, p.Z] == Voxel.Ground)) break;
-
+          // La foreuse transforme les Voxels Underground en Void jusqu'à ce qu'elle détecte de l'air.
           points[x, y, z] = Voxel.Void;
+
+          if (
+            points[c.X, c.Y, c.Z] == Voxel.Air ||
+            points[n.X, n.Y, n.Z] == Voxel.Air ||
+            points[e.X, e.Y, e.Z] == Voxel.Air ||
+            points[s.X, s.Y, s.Z] == Voxel.Air ||
+            points[o.X, o.Y, o.Z] == Voxel.Air) break;
         }
       }
     }
@@ -251,7 +250,7 @@ public sealed class Modelisation : IModelisation
   /// <param name="height"></param>
   /// <param name="step"></param>
   /// <returns></returns>
-  public static (double Min, double Max) GetElevationsScale(double[,] heightMap, int width, int height, int step)
+  private static (double Min, double Max) GetElevationsScale(double[,] heightMap, int width, int height, int step)
   {
     var min = double.MaxValue;
     var max = double.MinValue;
@@ -274,15 +273,10 @@ public sealed class Modelisation : IModelisation
   }
 
 
-  private static int ComputeElevation(
-    int z,
-    MeshOptions options,
-    MeshParameters parameters)
+  private static int ComputeElevation(int z, MeshOptions options, MeshParameters parameters)
   {
-    // Applique l’arrondi selon TopographyStep
     var roundedLevel = RoundElevation(z, options.TopographyStep);
 
-    // Normalisation et conversion en unités de mesh
     var elevation = (roundedLevel - parameters.ElevationScale.Min)
                     / parameters.MetersPerPixel
                     * options.Exaggeration;
@@ -290,221 +284,3 @@ public sealed class Modelisation : IModelisation
     return (int)Math.Round(elevation);
   }
 }
-
-
-/*
-/// </summary>
-/// <param name="elevationGrid">Grille 2D des altitudes (double).</param>
-/// <param name="step">Pas de filtrage pour le mesh (ex: 8 pour prendre un point sur 8).</param>
-/// <param name="tileSize"></param>
-/// <param name="exageration"></param>
-/// <returns>Chaîne contenant le contenu du fichier OBJ.</returns>
-public string CreateMesh(double[,] elevationGrid, double tileSize, double exageration = 1.0, int step = 1)
-{
-var obj = new StringBuilder();
-
-var width = elevationGrid.GetLength(0);
-var height = elevationGrid.GetLength(1);
-
-// Calcul du minimum et maximum d'altitude pour normalisation
-var zMin = double.MaxValue;
-var zMax = double.MinValue;
-
-for (var x = 0; x < width; x++)
-{
-for (var y = 0; y < height; y++)
-{
-var z = elevationGrid[x, y];
-if (z < zMin) zMin = z;
-if (z > zMax) zMax = z;
-}
-}
-
-// Centre de la grille pour centrer le mesh
-var x0 = width / 2.0;
-var y0 = height / 2.0;
-
-// Conversion en mètres pour chaque “pixel” de la grille
-var metersPerPixel = tileSize / width;
-
-// Échelle de la hauteur : on veut que la différence zMax-zMin corresponde
-// à la même proportion que la taille horizontale d'un pixel
-var heightScale = (zMax - zMin) / metersPerPixel; // ratio réel
-if (heightScale == 0) heightScale = 1.0; // éviter division par zéro
-
-Console.WriteLine($"Tile size (m)           : {tileSize}");
-Console.WriteLine($"Altitude max (m)        : {zMax}");
-Console.WriteLine($"Altitude range (m)      : {zMax - zMin}");
-Console.WriteLine($"Height scale (unit/m)   : {heightScale}");
-Console.WriteLine($"Meters per pixel (m/px) : {metersPerPixel}");
-
-var previousElevation = 0.0;
-// Boucle sur la grille avec filtrage
-for (var x = 0; x < width; x += step)
-{
-for (var y = 0; y < height; y += step)
-{
-var currentElevation = elevationGrid[x, y];
-
-
-
-previousElevation = currentElevation;
-
-// Conversion en coordonnées relatives centrées
-var xf = (x - x0);
-var yf = (y - y0);
-var zf = (currentElevation - zMin) / metersPerPixel * exageration;
-
-obj.AppendLine($"v {xf.ToString(CultureInfo.InvariantCulture)} {zf.ToString(CultureInfo.InvariantCulture)} {yf.ToString(CultureInfo.InvariantCulture)}");
-}
-}
-
-
-
-
-
-
-
-for (int y = 0; y < height - 1; y++)
-{
-for (int x = 0; x < width - 1; x++)
-{
-int i = y * width + x + 1; // +1 car OBJ est 1-based
-
-int iRight = i + 1;
-int iDown = i + width;
-int iDownRight = iDown + 1;
-
-// Triangle 1
-obj.AppendLine($"f {i} {iDown} {iRight}");
-
-// Triangle 2
-obj.AppendLine($"f {iRight} {iDown} {iDownRight}");
-}
-}
-
-File.WriteAllText("terrain.obj", obj.ToString());
-
-// Sauvegarde du fichier
-File.WriteAllText("mesh.obj", obj.ToString());
-
-return obj.ToString();
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-AVEC PALLIER
-/// <summary>
-  /// Crée un mesh OBJ à partir d'un raster représenté sous forme de grille 2D.
-  /// </summary>
-  /// <param name="elevationGrid">Grille 2D des altitudes (double).</param>
-  /// <param name="step">Pas de filtrage pour le mesh (ex: 8 pour prendre un point sur 8).</param>
-  /// <param name="tileSize"></param>
-  /// <param name="exageration"></param>
-  /// <returns>Chaîne contenant le contenu du fichier OBJ.</returns>
-  public string CreateMesh(double[,] elevationGrid, double tileSize, double exageration = 1.0, int step = 1)
-  {
-    var obj = new StringBuilder();
-
-    var width = elevationGrid.GetLength(0);
-    var height = elevationGrid.GetLength(1);
-
-    // Calcul du minimum et maximum d'altitude pour normalisation
-    var zMin = double.MaxValue;
-    var zMax = double.MinValue;
-
-    for (var x = 0; x < width; x++)
-    {
-      for (var y = 0; y < height; y++)
-      {
-        var z = elevationGrid[x, y];
-        if (z < zMin) zMin = z;
-        if (z > zMax) zMax = z;
-      }
-    }
-
-    // Centre de la grille pour centrer le mesh
-    var x0 = width / 2.0;
-    var y0 = height / 2.0;
-
-    // Conversion en mètres pour chaque “pixel” de la grille
-    var metersPerPixel = tileSize / width;
-
-    // Échelle de la hauteur : on veut que la différence zMax-zMin corresponde
-    // à la même proportion que la taille horizontale d'un pixel
-    var heightScale = (zMax - zMin) / metersPerPixel; // ratio réel
-    if (heightScale == 0) heightScale = 1.0; // éviter division par zéro
-
-    Console.WriteLine($"Tile size (m)           : {tileSize}");
-    Console.WriteLine($"Altitude max (m)        : {zMax}");
-    Console.WriteLine($"Altitude range (m)      : {zMax - zMin}");
-    Console.WriteLine($"Height scale (unit/m)   : {heightScale}");
-    Console.WriteLine($"Meters per pixel (m/px) : {metersPerPixel}");
-
-    var elevation = 0.0;
-    // Boucle sur la grille avec filtrage
-    for (var x = 0; x < width - step; x += step)
-    {
-      for (var y = 0; y < height - step; y += step)
-      {
-        var a = RoundElevation(elevationGrid[x, y]);
-        var b = RoundElevation(elevationGrid[x + step, y]);
-        var c = RoundElevation(elevationGrid[x + step, y + step]);
-        var d = RoundElevation(elevationGrid[x, y + step]);
-        /*
-        var a = (elevationGrid[x, y]);
-        var b = (elevationGrid[x + step, y]);
-        var c = (elevationGrid[x + step, y + step]);
-        var d = (elevationGrid[x, y + step]);
-        * /
-        if (a < b) continue;
-
-        elevation = a;
-
-        // Conversion en coordonnées relatives centrées
-        var xf = (x - x0);
-        var yf = (y - y0);
-        var zf = (elevation - zMin) / metersPerPixel * exageration;
-
-        obj.AppendLine(
-          $"v {xf.ToString(CultureInfo.InvariantCulture)} {zf.ToString(CultureInfo.InvariantCulture)} {yf.ToString(CultureInfo.InvariantCulture)}");
-      }
-    }
-
-    File.WriteAllText("terrain.obj", obj.ToString());
-
-    // Sauvegarde du fichier
-    File.WriteAllText("mesh.obj", obj.ToString());
-
-    return obj.ToString();
-  }
-
-
-
-
-
-
-
-    Console.WriteLine($"Tile size (m)           : {tileSize}");
-    Console.WriteLine($"Altitude max (m)        : {elevationsScale.Max}");
-    Console.WriteLine($"Altitude range (m)      : {elevationsScale.Max - elevationsScale.Min}");
-    Console.WriteLine($"Height scale (unit/m)   : {heightScale}");
-    Console.WriteLine($"Meters per pixel (m/px) : {mpp}");
-*/
