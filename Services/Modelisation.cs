@@ -46,7 +46,7 @@ public sealed class Modelisation : IModelisation
     Console.WriteLine("elevation min " + parameters.ElevationScale.Min);
     Console.WriteLine("mpp : " + parameters.MetersPerPixel);
     Console.WriteLine("ex : " + options.Exaggeration);
-    
+
     for (var x = 0; x < parameters.Size.Width - options.LateralStep; x += options.LateralStep)
     {
       for (var y = 0; y < parameters.Size.Height - options.LateralStep; y += options.LateralStep)
@@ -63,7 +63,7 @@ public sealed class Modelisation : IModelisation
         obj.AppendLine($"f {v2} {v4} {v3}");
       }
     }
-    
+
 
     // Sauvegarde du fichier
     File.WriteAllText("mesh.obj", obj.ToString());
@@ -79,15 +79,29 @@ public sealed class Modelisation : IModelisation
     //var vertexIndex = 1;
     //var vertexIndices = new int[parameters.Size.Width, parameters.Size.Height];
     var index = 1;
+    
+    obj.AppendLine("v -128.5 0 -128.5");
+    obj.AppendLine("v 128.5 0 -128.5");
+    obj.AppendLine("v 128.5 0 128.5");
+    obj.AppendLine("v -128.5 0 128.5");
+    obj.AppendLine("f 1 2 4 3");
 
-    for (var z = (int)parameters.ElevationScale.Min; z < parameters.ElevationScale.Max; z += options.TopographyStep)
+    var vIndex = 4;
+    
+    // il faudrait peut être que le z soit la dernière boucle afin de faciliter la construction de face
+    for (var z = (int)parameters.ElevationScale.Min + options.TopographyStep; z < parameters.ElevationScale.Max; z += options.TopographyStep)
     {
       for (var x = 0; x < parameters.Size.Width - options.LateralStep; x += options.LateralStep)
       {
         for (var y = 0; y < parameters.Size.Height - options.LateralStep; y += options.LateralStep)
         {
-          if (voxels[x, y, z] is Voxel.Air) continue;
           if (voxels[x, y, z] is Voxel.Void) continue;
+          if (voxels[x, y, z] is Voxel.Air)
+          {
+            // il faudrait ici marquer les deux points les plus haut de la colonne.
+            // il n'y a peut etre pas besoin de créer un cube sur les faces latérales
+            break;
+          }
 
           var elevation = ComputeElevation(z, options, parameters);
 
@@ -105,6 +119,8 @@ public sealed class Modelisation : IModelisation
         }
       }
     }
+
+
 
     File.WriteAllText("mesh.obj", obj.ToString());
 
@@ -143,10 +159,10 @@ public sealed class Modelisation : IModelisation
         $"{py.ToString(CultureInfo.InvariantCulture)}");
 
       vertexIndices[i] = index;
+
+
       index++; // incrémente l’index global pour le prochain sommet
     }
-    
-    //if (center.z == 0) obj.AppendLine($"f {vertexIndices[0]} {vertexIndices[1]} {vertexIndices[4]} {vertexIndices[5]}"); 
 
     /*
     obj.AppendLine($"f {vertexIndices[4]} {vertexIndices[5]} {vertexIndices[7]} {vertexIndices[6]}"); // Front
