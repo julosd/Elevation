@@ -4,8 +4,8 @@ namespace Elevation.Services;
 
 public interface IModelisation
 {
-  string CreateMesh(double[,] elevationGrid, double tileSize, int step = 1);
-  Dictionary<double, List<Coordinates>> CreateLevel(List<Coordinates> coordinates);
-  void CreateTerrain(Dictionary<double, List<Coordinates>> levels);
-  Dictionary<(int X, int Y), int> IndexElevationByXY(IEnumerable<Coordinates> coordinates);
+  string CreateMesh(double[,] elevationGrid, MeshOptions options, MeshParameters parameters);
+  string CreateMesh2(Voxel[,,] elevationGrid, MeshOptions options, MeshParameters parameters);
+  Voxel[,,] CreateVoxels(double[,] heightmap, int step);
+  Voxel[,,] Extrusion(Voxel[,,] points, int step, (double Min, double Max) scale);
 }

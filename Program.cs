@@ -44,6 +44,12 @@ app.MapGet("/elevation", async (IGeneral general, double latitude, double longit
 });
 #endregion
 
+
+
+
+
+
+
 app.MapGet("/track", async (IGeneral general) =>
 {
   try
@@ -86,11 +92,49 @@ app.MapGet("/track", async (IGeneral general) =>
   }
 });
 
+
+
+app.MapGet("/mesh/", async (IGeneral general, IModelisation modelisation, double latitude, double longitude, int zoom = 14, int topographyStep = 1) =>
+{
+  var tile = general.GetTile(latitude, longitude, zoom);
+  var raster = await general.GetRaster(tile);
+  var coordinates = general.ExtractCoordinatesFromRaster(raster);
+  //coordinates = general.AddCoordinates(coordinates);
+  //coordinates = general.AddCoordinates(coordinates);
+  //coordinates = general.AddCoordinates(coordinates);
+  
+  var options = new MeshOptions(topographyStep, exaggeration: 1, 1);
+  var parameters = new MeshParameters(latitude, zoom, coordinates, topographyStep);
+  var mesh = modelisation.CreateMesh(coordinates, options, parameters);
+
+  return Results.Ok("ok");
+});
+
+
+app.MapGet("/mesh-z/", async (IGeneral general, IModelisation modelisation, double latitude, double longitude, int zoom = 14, int topographyStep = 1) =>
+{
+  var tile = general.GetTile(latitude, longitude, zoom);
+  var tileSize = general.GetTileSize(latitude, zoom);
+  var raster = await general.GetRaster(tile);
+  var coordinates = general.ExtractCoordinatesFromRaster(raster);
+  var levels = modelisation.CreateVoxels(coordinates, topographyStep);
+  
+  var options = new MeshOptions(topographyStep, exaggeration: 1, 1);
+  var parameters = new MeshParameters(latitude, zoom, coordinates, topographyStep);
+  var mesh = modelisation.CreateMesh2(levels, options, parameters);
+  
+  Console.WriteLine("ok");
+
+  return Results.Ok("ok");
+});
+
+
+
 app.MapGet("/test2/", async (IGeneral general, IModelisation modelisation, double latitude, double longitude, int zoom = 14) =>
 {
   var tile = general.GetTile(latitude, longitude, zoom);
   var raster = await general.GetRaster(tile);
-  var coordinates = general.ExtractCoordinatesRelativesFromRaster(raster);
+  var coordinates = general.ExtractCoordinatesFromRaster(raster);
   //var levels = modelisation.IndexElevationByXY(coordinates);
   //modelisation.CreateTerrain(levels);
   
@@ -100,24 +144,13 @@ app.MapGet("/test2/", async (IGeneral general, IModelisation modelisation, doubl
 
 
 
-app.MapGet("/mesh/", async (IGeneral general, IModelisation modelisation, double latitude, double longitude, int zoom = 14) =>
+
+
+app.MapGet("/tiles", (IGeneral general, IConfiguration configuration, double latitude, double longitude, int zoom) =>
 {
+  var token = configuration["Secrets:MapBoxToken"];
   var tile = general.GetTile(latitude, longitude, zoom);
-  var tileSize = general.GetTileSize(latitude, zoom);
-  var raster = await general.GetRaster(tile);
-  var coordinates = general.ExtractCoordinatesRelativesFromRaster(raster);
-  var mesh = modelisation.CreateMesh(coordinates, tileSize);
-
-  return Results.Ok("ok");
-});
-
-
-
-app.MapGet("/tiles", (IGeneral general, double latitude, double longitude, int zoom) =>
-{
-  var tile = general.GetTile(latitude, longitude, zoom);
-  var url =
-    $"curl https://api.mapbox.com/v4/mapbox.satellite/{tile.Z}/{tile.X}/{tile.Y}@2x.png?access_token=pk.eyJ1IjoiZ3pvciIsImEiOiJjbTIwczk2MG8waGdqMmpzOHR2cjd2MDkwIn0.MC7S7t14bEbVQ7Tf3NdvVg --output \"test.png\"";
+  var url = $"curl https://api.mapbox.com/v4/mapbox.satellite/{tile.Z}/{tile.X}/{tile.Y}@2x.png?access_token={token} --output test.png";
   return Results.Ok(url);
 });
 
@@ -125,6 +158,15 @@ app.MapGet("/tiles", (IGeneral general, double latitude, double longitude, int z
 
 
 app.Run();
+
+
+
+
+
+
+
+
+
 
 
 /*
