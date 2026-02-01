@@ -72,28 +72,34 @@ public sealed class Modelisation : IModelisation
   }
 
 
-  public string CreateMesh2(Voxel[,,] voxels, MeshOptions options, MeshParameters parameters)
+  public string CreateMinecraftMesh(Voxel[,,] voxels, MeshOptions options, MeshParameters parameters)
   {
     Console.WriteLine("Création du mesh.");
     var obj = new StringBuilder();
     //var vertexIndex = 1;
     //var vertexIndices = new int[parameters.Size.Width, parameters.Size.Height];
-    var index = 1;
+    var width = parameters.Size.Width;
+    var height = parameters.Size.Height;
+    var lateralStep = options.LateralStep;
+    var zMin = (int)parameters.ElevationScale.Min;
+    var zMax = (int)parameters.ElevationScale.Max;
+
     
     obj.AppendLine("v -128.5 0 -128.5");
     obj.AppendLine("v 128.5 0 -128.5");
-    obj.AppendLine("v 128.5 0 128.5");
     obj.AppendLine("v -128.5 0 128.5");
+    obj.AppendLine("v 128.5 0 128.5");
     obj.AppendLine("f 1 2 4 3");
-
-    var vIndex = 4;
     
-    // il faudrait peut être que le z soit la dernière boucle afin de faciliter la construction de face
-    for (var z = (int)parameters.ElevationScale.Min + options.TopographyStep; z < parameters.ElevationScale.Max; z += options.TopographyStep)
+    var index = 5;
+    
+    var test = true;
+
+    for (var x = 0; x < width - lateralStep; x += lateralStep)
     {
-      for (var x = 0; x < parameters.Size.Width - options.LateralStep; x += options.LateralStep)
+      for (var y = 0; y < height - lateralStep; y += lateralStep)
       {
-        for (var y = 0; y < parameters.Size.Height - options.LateralStep; y += options.LateralStep)
+        for (var z = zMin; z < zMax; z += options.TopographyStep)
         {
           if (voxels[x, y, z] is Voxel.Void) continue;
           if (voxels[x, y, z] is Voxel.Air)
@@ -105,21 +111,14 @@ public sealed class Modelisation : IModelisation
 
           var elevation = ComputeElevation(z, options, parameters);
 
-
           var xf = (x - parameters.Center.X);
           var yf = (y - parameters.Center.Y);
 
-          //obj.AppendLine(
-          //  $"v {xf.ToString(CultureInfo.InvariantCulture)} " +
-          //  $"{elevation.ToString(CultureInfo.InvariantCulture)} " +
-          //  $"{yf.ToString(CultureInfo.InvariantCulture)}");
-
-          //if (x % 2 == 0 && y % 2 == 0) CreateVoxel((xf, yf, elevation), obj, ref index);
-          CreateCube((xf, yf, elevation), voxels, obj, ref index);
+          if (test) CreateCube((xf, yf, elevation), voxels, obj, ref index, zMin);
+          //test = false;
         }
       }
     }
-
 
 
     File.WriteAllText("mesh.obj", obj.ToString());
@@ -127,51 +126,30 @@ public sealed class Modelisation : IModelisation
     return obj.ToString();
   }
 
-  private static void CreateCube((int x, int y, int z) center, Voxel[,,] voxels, StringBuilder obj, ref int index)
+
+  private static void CreateCube((int x, int y, int z) p, Voxel[,,] voxels, StringBuilder obj, ref int index, int zMin) 
   {
-    const float halfSize = .5f;
+    CreateCubeVertex(obj, p, 0.5f);
+    index += 8;
 
-    var offsets = new[]
-    {
-      new Vector3(-halfSize, -halfSize, -halfSize), // BLB  Bottom Left Back
-      new Vector3(halfSize, -halfSize, -halfSize), // BRB  Bottom Right Back
-      new Vector3(-halfSize, halfSize, -halfSize), // TLB  Top Left Back
-      new Vector3(halfSize, halfSize, -halfSize), // TRB  Top Right Back
-      new Vector3(-halfSize, -halfSize, halfSize), // BLF  Bottom Left Front
-      new Vector3(halfSize, -halfSize, halfSize), // BRF  Bottom Right Front
-      new Vector3(-halfSize, halfSize, halfSize), // TLF  Top Left Front
-      new Vector3(halfSize, halfSize, halfSize) // TRF  Top Right Front
-    };
+    var v1 = index - 8;
+    var v2 = index - 7;
+    var v3 = index - 6;
+    var v4 = index - 5;
+    var v5 = index - 4;
+    var v6 = index - 3;
+    var v7 = index - 2;
+    var v8 = index - 1;
+    
+   
+    
 
-
-    // tableau pour stocker les indices des 8 sommets
-    var vertexIndices = new int[8];
-
-    for (var i = 0; i < 8; i++)
-    {
-      var px = center.x + offsets[i].X;
-      var py = center.y + offsets[i].Y;
-      var pz = center.z + offsets[i].Z;
-
-      obj.AppendLine(
-        $"v {px.ToString(CultureInfo.InvariantCulture)} " +
-        $"{pz.ToString(CultureInfo.InvariantCulture)} " +
-        $"{py.ToString(CultureInfo.InvariantCulture)}");
-
-      vertexIndices[i] = index;
-
-
-      index++; // incrémente l’index global pour le prochain sommet
-    }
-
-    /*
-    obj.AppendLine($"f {vertexIndices[4]} {vertexIndices[5]} {vertexIndices[7]} {vertexIndices[6]}"); // Front
-    obj.AppendLine($"f {vertexIndices[0]} {vertexIndices[1]} {vertexIndices[3]} {vertexIndices[2]}"); // Back
-    obj.AppendLine($"f {vertexIndices[2]} {vertexIndices[3]} {vertexIndices[7]} {vertexIndices[6]}"); // Top
-    obj.AppendLine($"f {vertexIndices[0]} {vertexIndices[1]} {vertexIndices[5]} {vertexIndices[4]}"); // Bottom
-    obj.AppendLine($"f {vertexIndices[0]} {vertexIndices[2]} {vertexIndices[6]} {vertexIndices[4]}"); // Left
-    obj.AppendLine($"f {vertexIndices[1]} {vertexIndices[3]} {vertexIndices[7]} {vertexIndices[5]}"); // Right
-    */
+    obj.AppendLine($"f {v5} {v6} {v8} {v7}"); //top
+    obj.AppendLine($"f {v1} {v2} {v4} {v3}"); //bottom
+    obj.AppendLine($"f {v1} {v3} {v7} {v5}"); //left
+    obj.AppendLine($"f {v2} {v4} {v8} {v6}"); //right
+    obj.AppendLine($"f {v3} {v4} {v8} {v7}"); //front
+    obj.AppendLine($"f {v1} {v2} {v6} {v5}"); //back
   }
 
 
@@ -298,5 +276,48 @@ public sealed class Modelisation : IModelisation
                     * options.Exaggeration;
 
     return (int)Math.Round(elevation);
+  }
+
+  private static void CreateCubeVertex(StringBuilder obj, (int x, int y, int z) p, float half)
+  {
+    obj.AppendLine(
+      $"v {(p.x - half).ToString(CultureInfo.InvariantCulture)} " + // left
+      $"{(p.z - half).ToString(CultureInfo.InvariantCulture)} " + // bottom
+      $"{(p.y - half).ToString(CultureInfo.InvariantCulture)}"); // back
+
+    obj.AppendLine(
+      $"v {(p.x + half).ToString(CultureInfo.InvariantCulture)} " + // right
+      $"{(p.z - half).ToString(CultureInfo.InvariantCulture)} " + // bottom
+      $"{(p.y - half).ToString(CultureInfo.InvariantCulture)}"); // back
+
+    obj.AppendLine(
+      $"v {(p.x - half).ToString(CultureInfo.InvariantCulture)} " + // left
+      $"{(p.z - half).ToString(CultureInfo.InvariantCulture)} " + // bottom
+      $"{(p.y + half).ToString(CultureInfo.InvariantCulture)}"); // front
+
+    obj.AppendLine(
+      $"v {(p.x + half).ToString(CultureInfo.InvariantCulture)} " + // right
+      $"{(p.z - half).ToString(CultureInfo.InvariantCulture)} " + // bottom
+      $"{(p.y + half).ToString(CultureInfo.InvariantCulture)}"); // front
+
+    obj.AppendLine(
+      $"v {(p.x - half).ToString(CultureInfo.InvariantCulture)} " + // left
+      $"{(p.z + half).ToString(CultureInfo.InvariantCulture)} " + // top
+      $"{(p.y - half).ToString(CultureInfo.InvariantCulture)}"); // back
+
+    obj.AppendLine(
+      $"v {(p.x + half).ToString(CultureInfo.InvariantCulture)} " + // right
+      $"{(p.z + half).ToString(CultureInfo.InvariantCulture)} " + // top
+      $"{(p.y - half).ToString(CultureInfo.InvariantCulture)}"); // back
+
+    obj.AppendLine(
+      $"v {(p.x - half).ToString(CultureInfo.InvariantCulture)} " + // left
+      $"{(p.z + half).ToString(CultureInfo.InvariantCulture)} " + // top
+      $"{(p.y + half).ToString(CultureInfo.InvariantCulture)}"); // front
+
+    obj.AppendLine(
+      $"v {(p.x + half).ToString(CultureInfo.InvariantCulture)} " + // right
+      $"{(p.z + half).ToString(CultureInfo.InvariantCulture)} " + // top
+      $"{(p.y + half).ToString(CultureInfo.InvariantCulture)}"); // front
   }
 }
