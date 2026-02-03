@@ -84,15 +84,15 @@ public sealed class Modelisation : IModelisation
     var zMin = (int)parameters.ElevationScale.Min;
     var zMax = (int)parameters.ElevationScale.Max;
 
-    
+
     obj.AppendLine("v -128.5 0 -128.5");
     obj.AppendLine("v 128.5 0 -128.5");
     obj.AppendLine("v -128.5 0 128.5");
     obj.AppendLine("v 128.5 0 128.5");
-    obj.AppendLine("f 1 2 4 3");
-    
+    //obj.AppendLine("f 1 2 4 3");
+
     var index = 5;
-    
+
     var test = true;
 
     for (var x = 0; x < width - lateralStep; x += lateralStep)
@@ -127,10 +127,9 @@ public sealed class Modelisation : IModelisation
   }
 
 
-  private static void CreateCube((int x, int y, int z) p, Voxel[,,] voxels, StringBuilder obj, ref int index, int zMin) 
+  private static void CreateCube((int x, int y, int z) p, Voxel[,,] voxels, StringBuilder obj, ref int index, int zMin)
   {
-    CreateCubeVertex(obj, p, 0.5f);
-    index += 8;
+    CreateCubeVertex(obj, p, 0.5f, ref index);
 
     var v1 = index - 8;
     var v2 = index - 7;
@@ -140,16 +139,15 @@ public sealed class Modelisation : IModelisation
     var v6 = index - 3;
     var v7 = index - 2;
     var v8 = index - 1;
-    
-   
-    
 
+/*
     obj.AppendLine($"f {v5} {v6} {v8} {v7}"); //top
     obj.AppendLine($"f {v1} {v2} {v4} {v3}"); //bottom
     obj.AppendLine($"f {v1} {v3} {v7} {v5}"); //left
     obj.AppendLine($"f {v2} {v4} {v8} {v6}"); //right
     obj.AppendLine($"f {v3} {v4} {v8} {v7}"); //front
     obj.AppendLine($"f {v1} {v2} {v6} {v5}"); //back
+    */
   }
 
 
@@ -278,46 +276,66 @@ public sealed class Modelisation : IModelisation
     return (int)Math.Round(elevation);
   }
 
-  private static void CreateCubeVertex(StringBuilder obj, (int x, int y, int z) p, float half)
+  private static void CreateCubeVertex(StringBuilder obj, (int x, int y, int z) p, float half, ref int i)
   {
-    obj.AppendLine(
-      $"v {(p.x - half).ToString(CultureInfo.InvariantCulture)} " + // left
-      $"{(p.z - half).ToString(CultureInfo.InvariantCulture)} " + // bottom
-      $"{(p.y - half).ToString(CultureInfo.InvariantCulture)}"); // back
+    if (p.x == 0)
+    {
+      obj.AppendLine(
+        $"v {(p.x - half).ToString(CultureInfo.InvariantCulture)} " + // left
+        $"{(p.z - half).ToString(CultureInfo.InvariantCulture)} " + // bottom
+        $"{(p.y - half).ToString(CultureInfo.InvariantCulture)}"); // back
+      i++;
+    }
 
     obj.AppendLine(
       $"v {(p.x + half).ToString(CultureInfo.InvariantCulture)} " + // right
       $"{(p.z - half).ToString(CultureInfo.InvariantCulture)} " + // bottom
       $"{(p.y - half).ToString(CultureInfo.InvariantCulture)}"); // back
+    i++;
+    
+    if (p.x == 0)
+    {
+      obj.AppendLine(
+        $"v {(p.x - half).ToString(CultureInfo.InvariantCulture)} " + // left
+        $"{(p.z - half).ToString(CultureInfo.InvariantCulture)} " + // bottom
+        $"{(p.y + half).ToString(CultureInfo.InvariantCulture)}"); // front
+      i++;
+    }
 
     obj.AppendLine(
-      $"v {(p.x - half).ToString(CultureInfo.InvariantCulture)} " + // left
+      $"v {(p.x + half).ToString(CultureInfo.InvariantCulture)} " + // right
       $"{(p.z - half).ToString(CultureInfo.InvariantCulture)} " + // bottom
       $"{(p.y + half).ToString(CultureInfo.InvariantCulture)}"); // front
+    i++;
+    
+    if (p.x == 0)
+    {
+      obj.AppendLine(
+        $"v {(p.x - half).ToString(CultureInfo.InvariantCulture)} " + // left
+        $"{(p.z + half).ToString(CultureInfo.InvariantCulture)} " + // top
+        $"{(p.y - half).ToString(CultureInfo.InvariantCulture)}"); // back
+      i++;
+    }
 
     obj.AppendLine(
       $"v {(p.x + half).ToString(CultureInfo.InvariantCulture)} " + // right
-      $"{(p.z - half).ToString(CultureInfo.InvariantCulture)} " + // bottom
-      $"{(p.y + half).ToString(CultureInfo.InvariantCulture)}"); // front
-
-    obj.AppendLine(
-      $"v {(p.x - half).ToString(CultureInfo.InvariantCulture)} " + // left
       $"{(p.z + half).ToString(CultureInfo.InvariantCulture)} " + // top
       $"{(p.y - half).ToString(CultureInfo.InvariantCulture)}"); // back
+    i++;
+    
+    if (p.x == 0)
+    {
+      obj.AppendLine(
+        $"v {(p.x - half).ToString(CultureInfo.InvariantCulture)} " + // left
+        $"{(p.z + half).ToString(CultureInfo.InvariantCulture)} " + // top
+        $"{(p.y + half).ToString(CultureInfo.InvariantCulture)}"); // front
+      i++;
+    }
 
     obj.AppendLine(
       $"v {(p.x + half).ToString(CultureInfo.InvariantCulture)} " + // right
       $"{(p.z + half).ToString(CultureInfo.InvariantCulture)} " + // top
-      $"{(p.y - half).ToString(CultureInfo.InvariantCulture)}"); // back
-
-    obj.AppendLine(
-      $"v {(p.x - half).ToString(CultureInfo.InvariantCulture)} " + // left
-      $"{(p.z + half).ToString(CultureInfo.InvariantCulture)} " + // top
       $"{(p.y + half).ToString(CultureInfo.InvariantCulture)}"); // front
-
-    obj.AppendLine(
-      $"v {(p.x + half).ToString(CultureInfo.InvariantCulture)} " + // right
-      $"{(p.z + half).ToString(CultureInfo.InvariantCulture)} " + // top
-      $"{(p.y + half).ToString(CultureInfo.InvariantCulture)}"); // front
+    i++;
   }
 }
