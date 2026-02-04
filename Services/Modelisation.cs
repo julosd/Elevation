@@ -78,26 +78,26 @@ public sealed class Modelisation : IModelisation
     var obj = new StringBuilder();
     //var vertexIndex = 1;
     //var vertexIndices = new int[parameters.Size.Width, parameters.Size.Height];
-    var width = parameters.Size.Width;
-    var height = parameters.Size.Height;
+    var xMax = parameters.Size.Width;
+    var yMax = parameters.Size.Height;
     var lateralStep = options.LateralStep;
     var zMin = (int)parameters.ElevationScale.Min;
     var zMax = (int)parameters.ElevationScale.Max;
 
 
-    obj.AppendLine("v -128.5 0 -128.5");
-    obj.AppendLine("v 128.5 0 -128.5");
-    obj.AppendLine("v -128.5 0 128.5");
-    obj.AppendLine("v 128.5 0 128.5");
+    obj.AppendLine($"v -0.5 0 {xMax}");
+    obj.AppendLine($"v {xMax + .5} 0 {xMax + .5}");
+    obj.AppendLine($"v -0.5 0 -0.5");
+    obj.AppendLine($"v {xMax + .5} 0 -0.5");
     //obj.AppendLine("f 1 2 4 3");
 
     var index = 5;
 
     var test = true;
 
-    for (var x = 0; x < width - lateralStep; x += lateralStep)
+    for (var x = 0; x < xMax - lateralStep; x += lateralStep)
     {
-      for (var y = 0; y < height - lateralStep; y += lateralStep)
+      for (var y = 0; y < yMax - lateralStep; y += lateralStep)
       {
         for (var z = zMin; z < zMax; z += options.TopographyStep)
         {
@@ -114,7 +114,7 @@ public sealed class Modelisation : IModelisation
           var xf = (x - parameters.Center.X);
           var yf = (y - parameters.Center.Y);
 
-          if (test) CreateCube((xf, yf, elevation), voxels, obj, ref index, zMin);
+          if (test) CreateCube((x, y, elevation), voxels, obj, ref index, zMin);
           //test = false;
         }
       }
@@ -276,66 +276,81 @@ public sealed class Modelisation : IModelisation
     return (int)Math.Round(elevation);
   }
 
+  /// <summary>
+  /// Creer les sommets pour les cubes.
+  /// Les points <b>left</b> ne sont créés que pour la ligne x égale à zéro (donc dans la 1ere profondeur)
+  /// Les points <b>front</b> ne sont créés que pour la ligne y égale à zéro
+  /// </summary>
+  /// <param name="obj"></param>
+  /// <param name="p"></param>
+  /// <param name="half"></param>
+  /// <param name="i"></param>
   private static void CreateCubeVertex(StringBuilder obj, (int x, int y, int z) p, float half, ref int i)
   {
-    if (p.x == 0)
+    if (p is { x: 0, y: 0 })
     {
       obj.AppendLine(
         $"v {(p.x - half).ToString(CultureInfo.InvariantCulture)} " + // left
         $"{(p.z - half).ToString(CultureInfo.InvariantCulture)} " + // bottom
-        $"{(p.y - half).ToString(CultureInfo.InvariantCulture)}"); // back
+        $"{(p.y - half).ToString(CultureInfo.InvariantCulture)}"); // front
+      i++;
+    }
+
+    if (p.x == 0)
+    {
+      obj.AppendLine(
+        $"v {(p.x + half).ToString(CultureInfo.InvariantCulture)} " + // right
+        $"{(p.z - half).ToString(CultureInfo.InvariantCulture)} " + // bottom
+        $"{(p.y - half).ToString(CultureInfo.InvariantCulture)}"); // front
+      i++;
+    }
+
+    if (p.y == 0)
+    {
+      obj.AppendLine(
+        $"v {(p.x - half).ToString(CultureInfo.InvariantCulture)} " + // left
+        $"{(p.z - half).ToString(CultureInfo.InvariantCulture)} " + // bottom
+        $"{(p.y + half).ToString(CultureInfo.InvariantCulture)}"); // back
       i++;
     }
 
     obj.AppendLine(
       $"v {(p.x + half).ToString(CultureInfo.InvariantCulture)} " + // right
       $"{(p.z - half).ToString(CultureInfo.InvariantCulture)} " + // bottom
-      $"{(p.y - half).ToString(CultureInfo.InvariantCulture)}"); // back
+      $"{(p.y + half).ToString(CultureInfo.InvariantCulture)}"); // back
     i++;
-    
-    if (p.x == 0)
-    {
-      obj.AppendLine(
-        $"v {(p.x - half).ToString(CultureInfo.InvariantCulture)} " + // left
-        $"{(p.z - half).ToString(CultureInfo.InvariantCulture)} " + // bottom
-        $"{(p.y + half).ToString(CultureInfo.InvariantCulture)}"); // front
-      i++;
-    }
 
-    obj.AppendLine(
-      $"v {(p.x + half).ToString(CultureInfo.InvariantCulture)} " + // right
-      $"{(p.z - half).ToString(CultureInfo.InvariantCulture)} " + // bottom
-      $"{(p.y + half).ToString(CultureInfo.InvariantCulture)}"); // front
-    i++;
-    
-    if (p.x == 0)
+    if (p is { x: 0, y: 0 })
     {
       obj.AppendLine(
         $"v {(p.x - half).ToString(CultureInfo.InvariantCulture)} " + // left
         $"{(p.z + half).ToString(CultureInfo.InvariantCulture)} " + // top
-        $"{(p.y - half).ToString(CultureInfo.InvariantCulture)}"); // back
+        $"{(p.y - half).ToString(CultureInfo.InvariantCulture)}"); // front
       i++;
     }
 
-    obj.AppendLine(
-      $"v {(p.x + half).ToString(CultureInfo.InvariantCulture)} " + // right
-      $"{(p.z + half).ToString(CultureInfo.InvariantCulture)} " + // top
-      $"{(p.y - half).ToString(CultureInfo.InvariantCulture)}"); // back
-    i++;
-    
     if (p.x == 0)
+    {
+      obj.AppendLine(
+        $"v {(p.x + half).ToString(CultureInfo.InvariantCulture)} " + // right
+        $"{(p.z + half).ToString(CultureInfo.InvariantCulture)} " + // top
+        $"{(p.y - half).ToString(CultureInfo.InvariantCulture)}"); // front
+      i++;
+    }
+
+    if (p is { x: 0, y: 0 })
     {
       obj.AppendLine(
         $"v {(p.x - half).ToString(CultureInfo.InvariantCulture)} " + // left
         $"{(p.z + half).ToString(CultureInfo.InvariantCulture)} " + // top
-        $"{(p.y + half).ToString(CultureInfo.InvariantCulture)}"); // front
+        $"{(p.y + half).ToString(CultureInfo.InvariantCulture)}"); // back
       i++;
     }
 
-    obj.AppendLine(
-      $"v {(p.x + half).ToString(CultureInfo.InvariantCulture)} " + // right
-      $"{(p.z + half).ToString(CultureInfo.InvariantCulture)} " + // top
-      $"{(p.y + half).ToString(CultureInfo.InvariantCulture)}"); // front
-    i++;
+      obj.AppendLine(
+        $"v {(p.x + half).ToString(CultureInfo.InvariantCulture)} " + // right
+        $"{(p.z + half).ToString(CultureInfo.InvariantCulture)} " + // top
+        $"{(p.y + half).ToString(CultureInfo.InvariantCulture)}"); // back
+      i++;
   }
 }
