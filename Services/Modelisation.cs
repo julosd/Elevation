@@ -51,10 +51,10 @@ public sealed class Modelisation : IModelisation
     {
       for (var y = 0; y < parameters.Size.Height - options.LateralStep; y += options.LateralStep)
       {
-        int v1 = vertexIndices[x, y];
-        int v2 = vertexIndices[x + options.LateralStep, y];
-        int v3 = vertexIndices[x, y + options.LateralStep];
-        int v4 = vertexIndices[x + options.LateralStep, y + options.LateralStep];
+        var v1 = vertexIndices[x, y];
+        var v2 = vertexIndices[x + options.LateralStep, y];
+        var v3 = vertexIndices[x, y + options.LateralStep];
+        var v4 = vertexIndices[x + options.LateralStep, y + options.LateralStep];
 
         // Triangle 1
         obj.AppendLine($"f {v1} {v2} {v3}");
@@ -129,7 +129,7 @@ public sealed class Modelisation : IModelisation
 
   private static void CreateCube((int x, int y, int z) p, Voxel[,,] voxels, StringBuilder obj, ref int index, int zMin)
   {
-    CreateCubeVertex(obj, p, 0.5f, ref index);
+    CreateCubeVertex(obj, p, ref index);
 
     var v1 = index - 8;
     var v2 = index - 7;
@@ -140,141 +140,16 @@ public sealed class Modelisation : IModelisation
     var v7 = index - 2;
     var v8 = index - 1;
 
-/*
-    obj.AppendLine($"f {v5} {v6} {v8} {v7}"); //top
-    obj.AppendLine($"f {v1} {v2} {v4} {v3}"); //bottom
-    obj.AppendLine($"f {v1} {v3} {v7} {v5}"); //left
-    obj.AppendLine($"f {v2} {v4} {v8} {v6}"); //right
-    obj.AppendLine($"f {v3} {v4} {v8} {v7}"); //front
-    obj.AppendLine($"f {v1} {v2} {v6} {v5}"); //back
-    */
+    /*
+        obj.AppendLine($"f {v5} {v6} {v8} {v7}"); //top
+        obj.AppendLine($"f {v1} {v2} {v4} {v3}"); //bottom
+        obj.AppendLine($"f {v1} {v3} {v7} {v5}"); //left
+        obj.AppendLine($"f {v2} {v4} {v8} {v6}"); //right
+        obj.AppendLine($"f {v3} {v4} {v8} {v7}"); //front
+        obj.AppendLine($"f {v1} {v2} {v6} {v5}"); //back
+        */
   }
 
-
-  // Triangle 1
-  //obj.AppendLine($"f {v1} {v2} {v3}");
-
-  // Triangle 2
-  //obj.AppendLine($"f {v2} {v4} {v3}");
-
-
-  public Voxel[,,] CreateVoxels(double[,] heightmap, int step)
-  {
-    Console.WriteLine("Conversion height map -> voxels.");
-    var width = heightmap.GetLength(0);
-    var height = heightmap.GetLength(1);
-    var scale = GetElevationsScale(heightmap, width, height, step);
-
-    var results = new Voxel[width, height, (int)scale.Max];
-
-    for (var z = (int)scale.Min; z < scale.Max; z += step)
-    {
-      for (var x = 0; x < width; x++)
-      {
-        for (var y = 0; y < height; y++)
-        {
-          var elevation = (int)RoundElevation(heightmap[x, y], step);
-
-          if (elevation == z) results[x, y, z] = Voxel.Ground;
-          else if (elevation < z) results[x, y, z] = Voxel.Air;
-          else results[x, y, z] = Voxel.Underground;
-        }
-      }
-    }
-
-
-    results = Extrusion(results, step, scale);
-
-    return results;
-  }
-
-
-  public Voxel[,,] Extrusion(Voxel[,,] points, int step, (double Min, double Max) scale)
-  {
-    Console.WriteLine("Extrusion.");
-    var width = points.GetLength(0);
-    var height = points.GetLength(1);
-    //var scale = GetElevationsScale(points, width, height, step);
-
-    for (var x = 1; x < width - 2; x++)
-    {
-      for (var y = 1; y < height - 2; y++)
-      {
-        for (var z = (int)scale.Min + step; z < scale.Max - 2 * step; z += step)
-        {
-          var c = (X: x, Y: y, Z: z + 2 * step);
-          var n = (X: x, Y: y + 1, Z: z + step);
-          var e = (X: x + 1, Y: y, Z: z + step);
-          var s = (X: x, Y: y - 1, Z: z + step);
-          var o = (X: x - 1, Y: y, Z: z + step);
-
-          // La foreuse transforme les Voxels Underground en Void jusqu'à ce qu'elle détecte de l'air.
-          points[x, y, z] = Voxel.Void;
-
-          if (
-            points[c.X, c.Y, c.Z] == Voxel.Air ||
-            points[n.X, n.Y, n.Z] == Voxel.Air ||
-            points[e.X, e.Y, e.Z] == Voxel.Air ||
-            points[s.X, s.Y, s.Z] == Voxel.Air ||
-            points[o.X, o.Y, o.Z] == Voxel.Air) break;
-        }
-      }
-    }
-
-    return points;
-  }
-
-
-  /// <summary>
-  /// Arrondit une valeur à un multiple donné.
-  /// </summary>
-  /// <param name="value"></param>
-  /// <param name="step"></param>
-  /// <returns></returns>
-  private static double RoundElevation(double value, double step = 25.0) => Math.Round(value / step) * step;
-
-
-  /// <summary>
-  /// Retourne les bornes minamale et maximal d'une height map
-  /// </summary>
-  /// <param name="heightMap"></param>
-  /// <param name="width"></param>
-  /// <param name="height"></param>
-  /// <param name="step"></param>
-  /// <returns></returns>
-  private static (double Min, double Max) GetElevationsScale(double[,] heightMap, int width, int height, int step)
-  {
-    var min = double.MaxValue;
-    var max = double.MinValue;
-
-    for (var x = 0; x < width; x++)
-    {
-      for (var y = 0; y < height; y++)
-      {
-        var z = heightMap[x, y];
-
-        var zMinStep = Math.Floor(z / step) * step;
-        if (zMinStep < min) min = zMinStep;
-
-        var zMaxStep = Math.Ceiling(z / step) * step;
-        if (zMaxStep > max) max = zMaxStep;
-      }
-    }
-
-    return (min, max);
-  }
-
-
-  private static int ComputeElevation(int z, MeshOptions options, MeshParameters parameters)
-  {
-    var roundedLevel = RoundElevation(z, options.TopographyStep);
-
-    var elevation = (roundedLevel - parameters.ElevationScale.Min)
-                    / parameters.MetersPerPixel
-                    * options.Exaggeration;
-
-    return (int)Math.Round(elevation);
-  }
 
   /// <summary>
   /// Creer les sommets pour les cubes.
@@ -283,10 +158,11 @@ public sealed class Modelisation : IModelisation
   /// </summary>
   /// <param name="obj"></param>
   /// <param name="p"></param>
-  /// <param name="half"></param>
   /// <param name="i"></param>
-  private static void CreateCubeVertex(StringBuilder obj, (int x, int y, int z) p, float half, ref int i)
+  private static void CreateCubeVertex(StringBuilder obj, (int x, int y, int z) p, ref int i)
   {
+    const float half = .5f;
+
     if (p is { x: 0, y: 0 })
     {
       obj.AppendLine(
@@ -347,10 +223,125 @@ public sealed class Modelisation : IModelisation
       i++;
     }
 
-      obj.AppendLine(
-        $"v {(p.x + half).ToString(CultureInfo.InvariantCulture)} " + // right
-        $"{(p.z + half).ToString(CultureInfo.InvariantCulture)} " + // top
-        $"{(p.y + half).ToString(CultureInfo.InvariantCulture)}"); // back
-      i++;
+    obj.AppendLine(
+      $"v {(p.x + half).ToString(CultureInfo.InvariantCulture)} " + // right
+      $"{(p.z + half).ToString(CultureInfo.InvariantCulture)} " + // top
+      $"{(p.y + half).ToString(CultureInfo.InvariantCulture)}"); // back
+    i++;
+  }
+
+
+  public Voxel[,,] CreateVoxels(double[,] heightmap, int step)
+  {
+    Console.WriteLine("Conversion height map -> voxels.");
+    var width = heightmap.GetLength(0);
+    var height = heightmap.GetLength(1);
+    var scale = GetElevationsScale(heightmap, width, height, step);
+
+    var results = new Voxel[width, height, (int)scale.Max];
+
+    for (var z = (int)scale.Min; z < scale.Max; z += step)
+    {
+      for (var x = 0; x < width; x++)
+      {
+        for (var y = 0; y < height; y++)
+        {
+          var elevation = (int)RoundElevation(heightmap[x, y], step);
+
+          if (elevation == z) results[x, y, z] = Voxel.Ground;
+          else if (elevation < z) results[x, y, z] = Voxel.Air;
+          else results[x, y, z] = Voxel.Underground;
+        }
+      }
+    }
+
+    results = Extrusion(results, step, scale);
+
+    return results;
+  }
+
+
+  public Voxel[,,] Extrusion(Voxel[,,] points, int step, (double Min, double Max) scale)
+  {
+    Console.WriteLine("Extrusion.");
+    var width = points.GetLength(0);
+    var height = points.GetLength(1);
+    //var scale = GetElevationsScale(points, width, height, step);
+
+    for (var x = 1; x < width - 2; x++)
+    {
+      for (var y = 1; y < height - 2; y++)
+      {
+        for (var z = (int)scale.Min + step; z < scale.Max - 2 * step; z += step)
+        {
+          var c = (X: x, Y: y, Z: z + 2 * step);
+          var n = (X: x, Y: y + 1, Z: z + step);
+          var e = (X: x + 1, Y: y, Z: z + step);
+          var s = (X: x, Y: y - 1, Z: z + step);
+          var o = (X: x - 1, Y: y, Z: z + step);
+
+          // La foreuse transforme les Voxels Underground en Void jusqu'à ce qu'elle détecte de l'air.
+          points[x, y, z] = Voxel.Void;
+
+          if (
+            points[c.X, c.Y, c.Z] == Voxel.Air ||
+            points[n.X, n.Y, n.Z] == Voxel.Air ||
+            points[e.X, e.Y, e.Z] == Voxel.Air ||
+            points[s.X, s.Y, s.Z] == Voxel.Air ||
+            points[o.X, o.Y, o.Z] == Voxel.Air) break;
+        }
+      }
+    }
+
+    return points;
+  }
+
+
+  /// <summary>
+  /// Arrondit une valeur à un multiple donné.
+  /// </summary>
+  /// <param name="value"></param>
+  /// <param name="step"></param>
+  /// <returns></returns>
+  private static double RoundElevation(double value, double step = 25.0) => Math.Round(value / step) * step;
+
+
+  /// <summary>
+  /// Retourne les bornes minimale et maximale d'une height map
+  /// </summary>
+  /// <param name="heightMap"></param>
+  /// <param name="width"></param>
+  /// <param name="height"></param>
+  /// <param name="step"></param>
+  /// <returns></returns>
+  private static (double Min, double Max) GetElevationsScale(double[,] heightMap, int width, int height, int step)
+  {
+    var min = double.MaxValue;
+    var max = double.MinValue;
+
+    for (var x = 0; x < width; x++)
+    {
+      for (var y = 0; y < height; y++)
+      {
+        var z = heightMap[x, y];
+
+        var zMinStep = Math.Floor(z / step) * step;
+        if (zMinStep < min) min = zMinStep;
+
+        var zMaxStep = Math.Ceiling(z / step) * step;
+        if (zMaxStep > max) max = zMaxStep;
+      }
+    }
+
+    return (min, max);
+  }
+
+
+  private static int ComputeElevation(int z, MeshOptions options, MeshParameters parameters)
+  {
+    var roundedLevel = RoundElevation(z, options.TopographyStep);
+    var elevation = (roundedLevel - parameters.ElevationScale.Min) / parameters.MetersPerPixel * options.Exaggeration;
+
+    return (int)Math.Round(elevation);
   }
 }
