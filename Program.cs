@@ -121,7 +121,7 @@ app.MapGet("/mesh-z/", async (IGeneral general, IModelisation modelisation, doub
   
   var options = new MeshOptions(topographyStep, exaggeration: 1, 1);
   var parameters = new MeshParameters(latitude, zoom, coordinates, topographyStep);
-  var mesh = modelisation.CreateMesh2(levels, options, parameters);
+  var mesh = modelisation.CreateMinecraftMesh(levels, options, parameters);
   
   Console.WriteLine("ok");
 
